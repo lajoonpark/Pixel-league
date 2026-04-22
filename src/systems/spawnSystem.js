@@ -24,22 +24,22 @@ export function createSpawnSystem({
     const redSpawnX = redSide.x + spawnOffsetX;
     const totalMinions = minionsPerWavePerTeam;
 
-    for (let index = 0; index < totalMinions; index += 1) {
-      const delayMs = index * spawnStaggerMs;
+    for (let minionIndex = 0; minionIndex < totalMinions; minionIndex += 1) {
+      const delayMs = minionIndex * spawnStaggerMs;
       scheduledSpawns.push({ team: 'blue', x: blueSpawnX, y: laneY, delayMs });
       scheduledSpawns.push({ team: 'red', x: redSpawnX, y: laneY, delayMs });
     }
   }
 
   function flushScheduledSpawns(game, dtMs) {
-    for (let i = scheduledSpawns.length - 1; i >= 0; i -= 1) {
-      const scheduled = scheduledSpawns[i];
+    for (let spawnIndex = scheduledSpawns.length - 1; spawnIndex >= 0; spawnIndex -= 1) {
+      const scheduled = scheduledSpawns[spawnIndex];
       scheduled.delayMs -= dtMs;
       if (scheduled.delayMs > 0) {
         continue;
       }
       game.entities.push(new Minion(scheduled.x, scheduled.y, scheduled.team));
-      scheduledSpawns.splice(i, 1);
+      scheduledSpawns.splice(spawnIndex, 1);
     }
   }
 
