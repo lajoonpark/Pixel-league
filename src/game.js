@@ -17,7 +17,13 @@ export class Game {
     this.camera = new Camera(canvas.width, canvas.height, this.map.width, this.map.height);
     this.renderer = new Renderer(canvas, this.camera);
     this.entities = [];
-    this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
+    this.spawnSystem = createSpawnSystem({
+      waveIntervalMs: CONFIG.gameplay.minionWaveIntervalMs,
+      waveInitialDelayMs: CONFIG.gameplay.minionWaveInitialDelayMs,
+      minionsPerWavePerTeam: CONFIG.gameplay.minionsPerWavePerTeam,
+      spawnStaggerMs: CONFIG.gameplay.minionWaveSpawnStaggerMs,
+      spawnOffsetX: CONFIG.gameplay.minionWaveSpawnOffsetX,
+    });
     this.lastFrameAt = 0;
     this.fps = 0;
 
@@ -74,6 +80,8 @@ export class Game {
   }
 
   render() {
+    const spawnDebug = this.spawnSystem.getDebugState(this.entities);
+
     this.renderer.clear();
     this.renderer.drawMap(this.map);
 
@@ -85,9 +93,15 @@ export class Game {
     this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);
     this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 44);
     this.renderer.drawText(
-      `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
+      `Wave: ${(spawnDebug.nextWaveInMs / 1000).toFixed(1)}s  Minions: ${spawnDebug.minionCount}  Pending: ${spawnDebug.pendingSpawnCount}`,
       12,
       60,
+      { font: '11px monospace', color: '#b9c5d6' }
+    );
+    this.renderer.drawText(
+      `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
+      12,
+      76,
       { font: '10px monospace', color: '#b9c5d6' }
     );
   }

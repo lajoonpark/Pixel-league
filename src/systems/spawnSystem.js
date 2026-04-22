@@ -1,23 +1,68 @@
 // Spawn system periodically adds minions to both teams.
 import { Minion } from '../entities/Minion.js';
 
-export function createSpawnSystem(intervalMs) {
-  let elapsedMs = 0;
+export function createSpawnSystem({
+  waveIntervalMs,
+  waveInitialDelayMs = waveIntervalMs,
+  minionsPerWavePerTeam,
+  spawnStaggerMs,
+  spawnOffsetX,
+}) {
+  let timeUntilNextWaveMs = waveInitialDelayMs;
+  const scheduledSpawns = [];
 
-  return function spawnSystem(game, dtMs) {
-    elapsedMs += dtMs;
-    if (elapsedMs < intervalMs) {
+  function scheduleWave(game) {
+    const lane = game.map.lanes[0];
+    const laneY = lane.start.y;
+    const blueSide = game.map.sides.find((side) => side.team === 'blue');
+    const redSide = game.map.sides.find((side) => side.team === 'red');
+    if (!blueSide || !redSide) {
       return;
     }
-    elapsedMs = 0;
 
-    const lane = game.map.lanes[0];
-    const start = lane.points[0];
-    const end = lane.points[lane.points.length - 1];
+    const blueSpawnX = blueSide.x + blueSide.width - spawnOffsetX;
+    const redSpawnX = redSide.x + spawnOffsetX;
+    const totalMinions = minionsPerWavePerTeam;
 
-    game.entities.push(new Minion(start.x + 24, start.y - 20, 'blue'));
-    game.entities.push(new Minion(start.x + 24, start.y + 20, 'blue'));
-    game.entities.push(new Minion(end.x - 24, end.y - 20, 'red'));
-    game.entities.push(new Minion(end.x - 24, end.y + 20, 'red'));
+    for (let index = 0; index < totalMinions; index += 1) {
+      const delayMs = index * spawnStaggerMs;
+      scheduledSpawns.push({ team: 'blue', x: blueSpawnX, y: laneY, delayMs });
+      scheduledSpawns.push({ team: 'red', x: redSpawnX, y: laneY, delayMs });
+    }
+  }
+
+  function flushScheduledSpawns(game, dtMs) {
+    for (let i = scheduledSpawns.length - 1; i >= 0; i -= 1) {
+      const scheduled = scheduledSpawns[i];
+      scheduled.delayMs -= dtMs;
+      if (scheduled.delayMs > 0) {
+        continue;
+      }
+      game.entities.push(new Minion(scheduled.x, scheduled.y, scheduled.team));
+      scheduledSpawns.splice(i, 1);
+    }
+  }
+
+  const spawnSystem = function spawnSystem(game, dtMs) {
+    timeUntilNextWaveMs -= dtMs;
+    while (timeUntilNextWaveMs <= 0) {
+      scheduleWave(game);
+      timeUntilNextWaveMs += waveIntervalMs;
+    }
+    flushScheduledSpawns(game, dtMs);
   };
+
+  spawnSystem.getDebugState = function getDebugState(entities) {
+    const minionCount = entities.reduce(
+      (count, entity) => count + (entity.type === 'minion' ? 1 : 0),
+      0
+    );
+    return {
+      minionCount,
+      nextWaveInMs: Math.max(0, Math.ceil(timeUntilNextWaveMs)),
+      pendingSpawnCount: scheduledSpawns.length,
+    };
+  };
+
+  return spawnSystem;
 }

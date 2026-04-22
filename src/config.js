@@ -11,7 +11,11 @@ export const CONFIG = {
     laneHeight: 96,
   },
   gameplay: {
-    minionSpawnIntervalMs: 3000,
+    minionWaveIntervalMs: 10000,
+    minionWaveInitialDelayMs: 1000,
+    minionsPerWavePerTeam: 3,
+    minionWaveSpawnStaggerMs: 250,
+    minionWaveSpawnOffsetX: 24,
     heroSpawnLaneOffsetX: 60,
     defaultHeroMoveSpeed: 220,
     minionSpeed: 90,
