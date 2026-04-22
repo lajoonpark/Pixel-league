@@ -1,6 +1,6 @@
 // Minion entity that walks down a lane.
 export class Minion {
-  constructor(x, y, team = 'blue', laneId = 'mid', laneIndex = 0) {
+  constructor(x, y, team = 'blue', laneId = null, laneIndex = null) {
     const isAllied = team === 'blue';
 
     this.type = 'minion';

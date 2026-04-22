@@ -35,7 +35,10 @@ function updateMinionMovement(minion, map, dtSeconds) {
     return;
   }
 
-  const laneCenterY = lane.start.y;
+  const laneCenterY = lane.start?.y ?? lane.points?.[0]?.y ?? lane.path?.[0]?.y;
+  if (typeof laneCenterY !== 'number') {
+    return;
+  }
   const moveDirection = minion.team === 'blue' ? 1 : -1;
   minion.vx = moveDirection * minion.moveSpeed;
   minion.vy = 0;
