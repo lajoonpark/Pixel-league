@@ -15,16 +15,22 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (!isValidTarget(attacker, attacker.target)) {
-      attacker.target = null;
-    }
-
     const attackRangeSq = attacker.attackRange * attacker.attackRange;
-    let nearestTarget = null;
-    let nearestDistanceSq = Infinity;
+    const currentTargetInRange = (
+      isValidTarget(attacker, attacker.target)
+      && distanceSquared(attacker, attacker.target) <= attackRangeSq
+    );
+
+    let nearestTarget = currentTargetInRange ? attacker.target : null;
+    let nearestDistanceSq = currentTargetInRange
+      ? distanceSquared(attacker, attacker.target)
+      : Infinity;
 
     for (const candidate of entities) {
       if (!isValidTarget(attacker, candidate)) {
+        continue;
+      }
+      if (candidate === attacker.target && currentTargetInRange) {
         continue;
       }
 
