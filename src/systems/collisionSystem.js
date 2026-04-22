@@ -4,6 +4,8 @@ import { clamp } from '../utils.js';
 const MIN_OVERLAP_TO_RESOLVE = 1.5;
 const MAX_DYNAMIC_SEPARATION_PER_STEP = 4;
 const MAX_STATIC_SEPARATION_PER_STEP = 6;
+const HERO_COLLISION_WEIGHT = 0.85;
+const MINION_COLLISION_WEIGHT = 0.5;
 
 function isActiveEntity(entity) {
   if (!entity || typeof entity.x !== 'number' || typeof entity.y !== 'number') {
@@ -20,7 +22,7 @@ function isActiveEntity(entity) {
 function getWeight(entity) {
   // Keep hero collision simple and avoid unrealistic hero shove behavior.
   // The hero yields more than minions during overlap correction.
-  return entity.type === 'hero' ? 0.85 : 0.5;
+  return entity.type === 'hero' ? HERO_COLLISION_WEIGHT : MINION_COLLISION_WEIGHT;
 }
 
 function resolveDynamicOverlap(a, b) {
