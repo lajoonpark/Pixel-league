@@ -15,6 +15,7 @@ export class Minion {
     this.attackDamage = 8;
     this.attackRange = 28;
     this.attackCooldown = 1000;
+    this.lastAttackAt = 0;
     this.target = null;
     this.alive = true;
     this.laneId = laneId;

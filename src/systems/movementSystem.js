@@ -27,6 +27,8 @@ function updateMinionMovement(minion, map, dtSeconds) {
   }
 
   if (minion.target) {
+    minion.vx = 0;
+    minion.vy = 0;
     return;
   }
 

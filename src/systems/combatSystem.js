@@ -1,34 +1,50 @@
-// Combat system applies simple nearest-target auto attacks.
+// Combat system applies simple nearest-target auto attacks for minions.
 import { distanceSquared } from '../utils.js';
 
-export function combatSystem(entities, nowMs, attackRange) {
-  const rangeSq = attackRange * attackRange;
+function isLivingMinion(entity) {
+  return entity?.type === 'minion' && entity.alive && entity.health > 0;
+}
 
+function isValidTarget(attacker, target) {
+  return isLivingMinion(target) && target.team !== attacker.team;
+}
+
+export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
-    if (typeof attacker.damage !== 'number' || typeof attacker.attackCooldownMs !== 'number') {
-      continue;
-    }
-    if (nowMs - attacker.lastAttackAt < attacker.attackCooldownMs) {
+    if (!isLivingMinion(attacker)) {
       continue;
     }
 
-    let target = null;
-    let bestDist = Infinity;
+    if (!isValidTarget(attacker, attacker.target)) {
+      attacker.target = null;
+    }
+
+    const attackRangeSq = attacker.attackRange * attacker.attackRange;
+    let nearestTarget = null;
+    let nearestDistanceSq = Infinity;
 
     for (const candidate of entities) {
-      if (candidate === attacker || candidate.team === attacker.team || candidate.health <= 0) {
+      if (!isValidTarget(attacker, candidate)) {
         continue;
       }
-      const dist = distanceSquared(attacker, candidate);
-      if (dist <= rangeSq && dist < bestDist) {
-        bestDist = dist;
-        target = candidate;
+
+      const distSq = distanceSquared(attacker, candidate);
+      if (distSq <= attackRangeSq && distSq < nearestDistanceSq) {
+        nearestDistanceSq = distSq;
+        nearestTarget = candidate;
       }
     }
 
-    if (target) {
-      target.health -= attacker.damage;
-      attacker.lastAttackAt = nowMs;
+    attacker.target = nearestTarget;
+    if (!attacker.target) {
+      continue;
     }
+
+    if (nowMs - attacker.lastAttackAt < attacker.attackCooldown) {
+      continue;
+    }
+
+    attacker.target.health = Math.max(0, attacker.target.health - attacker.attackDamage);
+    attacker.lastAttackAt = nowMs;
   }
 }
