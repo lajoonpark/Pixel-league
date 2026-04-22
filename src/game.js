@@ -54,7 +54,7 @@ export class Game {
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
     this.spawnSystem(this, dtMs);
-    movementSystem(this.entities, dtSeconds);
+    movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
     this.camera.follow(this.hero);
   }
