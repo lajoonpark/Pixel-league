@@ -1,9 +1,13 @@
 // Collision system enforces simple world boundary constraints.
 import { clamp } from '../utils.js';
 
+// Minimum overlap in pixels before applying separation.
 const MIN_OVERLAP_TO_RESOLVE = 1.5;
+// Maximum dynamic unit separation applied per frame, in pixels.
 const MAX_DYNAMIC_SEPARATION_PER_STEP = 4;
+// Maximum placeholder-vs-hero correction applied per frame, in pixels.
 const MAX_STATIC_SEPARATION_PER_STEP = 6;
+// Relative separation weights (higher = receives more correction movement).
 const HERO_COLLISION_WEIGHT = 0.85;
 const MINION_COLLISION_WEIGHT = 0.5;
 

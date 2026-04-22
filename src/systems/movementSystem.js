@@ -1,7 +1,9 @@
 // Movement system updates entity positions based on velocity.
 import { clamp, distanceSquared } from '../utils.js';
 
+// Max lane recenter speed, relative to forward move speed.
 const LANE_CORRECTION_SPEED_RATIO = 0.6;
+// Proportional gain for lane recentering based on Y offset.
 const LANE_CORRECTION_MULTIPLIER = 5;
 
 function getLaneForMinion(minion, map) {
