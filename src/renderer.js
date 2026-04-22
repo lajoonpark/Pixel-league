@@ -30,16 +30,57 @@ export class Renderer {
       map.height
     );
 
-    // Lanes are intentionally simple strips for prototype readability.
+    for (const side of map.sides ?? []) {
+      const sidePos = this.camera.worldToScreen(side.x, side.y);
+      this.ctx.fillStyle = side.team === 'blue' ? '#253a64' : '#5a2b2b';
+      this.ctx.fillRect(
+        Math.round(sidePos.x),
+        Math.round(sidePos.y),
+        side.width,
+        side.height
+      );
+    }
+
     for (const lane of map.lanes) {
-      const lanePos = this.camera.worldToScreen(lane.x, lane.y);
+      const lanePos = this.camera.worldToScreen(lane.bounds.x, lane.bounds.y);
       this.ctx.fillStyle = '#2d3446';
       this.ctx.fillRect(
         Math.round(lanePos.x),
         Math.round(lanePos.y),
-        lane.width,
-        lane.height
+        lane.bounds.width,
+        lane.bounds.height
       );
+
+      this.ctx.fillStyle = '#7f89a5';
+      const centerStart = this.camera.worldToScreen(lane.start.x, lane.start.y - 2);
+      this.ctx.fillRect(
+        Math.round(centerStart.x),
+        Math.round(centerStart.y),
+        lane.end.x - lane.start.x,
+        4
+      );
+
+      for (const towerSlot of lane.placeholders?.towerSlots ?? []) {
+        const towerPos = this.camera.worldToScreen(towerSlot.x - towerSlot.width / 2, towerSlot.y - towerSlot.height / 2);
+        this.ctx.fillStyle = towerSlot.team === 'blue' ? '#5d82d1' : '#bf6464';
+        this.ctx.fillRect(
+          Math.round(towerPos.x),
+          Math.round(towerPos.y),
+          towerSlot.width,
+          towerSlot.height
+        );
+      }
+
+      for (const baseSlot of lane.placeholders?.baseSlots ?? []) {
+        const basePos = this.camera.worldToScreen(baseSlot.x - baseSlot.width / 2, baseSlot.y - baseSlot.height / 2);
+        this.ctx.fillStyle = baseSlot.team === 'blue' ? '#3f6dce' : '#b55252';
+        this.ctx.fillRect(
+          Math.round(basePos.x),
+          Math.round(basePos.y),
+          baseSlot.width,
+          baseSlot.height
+        );
+      }
     }
   }
 
