@@ -45,6 +45,10 @@ export function combatSystem(entities, nowMs) {
     if (!attacker.target) {
       continue;
     }
+    if (!isValidTarget(attacker, attacker.target)) {
+      attacker.target = null;
+      continue;
+    }
 
     if (nowMs - attacker.lastAttackAt < attacker.attackCooldownMs) {
       continue;
