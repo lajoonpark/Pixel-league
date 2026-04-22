@@ -1,19 +1,27 @@
-// Minion entity that walks down a lane and fights nearby enemies.
+// Minion entity that walks down a lane.
 export class Minion {
   constructor(x, y, team = 'blue') {
+    const isAllied = team === 'blue';
+
     this.type = 'minion';
-    this.team = team;
     this.x = x;
     this.y = y;
-    this.vx = 0;
-    this.vy = 0;
-    this.width = 14;
-    this.height = 14;
-    this.color = team === 'blue' ? '#7fc5ff' : '#ff8a8a';
-    this.health = 45;
+    this.width = 12;
+    this.height = 12;
+    this.team = team;
     this.maxHealth = 45;
-    this.damage = 8;
-    this.attackCooldownMs = 1000;
-    this.lastAttackAt = 0;
+    this.health = this.maxHealth;
+    this.moveSpeed = 90;
+    this.attackDamage = 8;
+    this.attackRange = 28;
+    this.attackCooldown = 1000;
+    this.target = null;
+    this.alive = true;
+
+    const moveDirection = isAllied ? 1 : -1;
+    this.color = isAllied ? '#7fc5ff' : '#ff8a8a';
+    this.vx = moveDirection * this.moveSpeed;
+    this.vy = 0;
+
   }
 }
