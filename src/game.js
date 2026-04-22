@@ -13,7 +13,13 @@ export class Game {
     this.canvas = canvas;
     this.map = createMap(CONFIG);
     this.input = new Input();
-    this.camera = new Camera(canvas.width, canvas.height, this.map.width, this.map.height);
+    this.camera = new Camera(
+      canvas.width,
+      canvas.height,
+      this.map.width,
+      this.map.height,
+      CONFIG.camera
+    );
     this.renderer = new Renderer(canvas, this.camera);
     this.entities = [];
     this.lastFrameAt = 0;
@@ -29,6 +35,7 @@ export class Game {
     const spawnY = lane.y + lane.height / 2;
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
+    this.camera.follow(this.hero);
   }
 
   start() {
@@ -53,7 +60,7 @@ export class Game {
     this.updateHeroVelocity();
     movementSystem(this.entities, dtSeconds);
     collisionSystem(this.entities, this.map);
-    this.camera.follow(this.hero);
+    this.camera.follow(this.hero, dtSeconds);
   }
 
   updateHeroVelocity() {

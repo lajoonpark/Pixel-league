@@ -10,6 +10,10 @@ export const CONFIG = {
     laneInset: 120,
     laneHeight: 96,
   },
+  camera: {
+    followMode: 'smooth', // 'direct' | 'smooth'
+    smoothFactor: 10,
+  },
   gameplay: {
     minionSpawnIntervalMs: 3000,
     heroSpawnLaneOffsetX: 60,

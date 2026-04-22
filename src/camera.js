@@ -2,20 +2,36 @@
 import { clamp } from './utils.js';
 
 export class Camera {
-  constructor(viewWidth, viewHeight, worldWidth, worldHeight) {
+  constructor(viewWidth, viewHeight, worldWidth, worldHeight, options = {}) {
     this.viewWidth = viewWidth;
     this.viewHeight = viewHeight;
     this.worldWidth = worldWidth;
     this.worldHeight = worldHeight;
+    this.followMode = options.followMode ?? 'direct';
+    this.smoothFactor = options.smoothFactor ?? 10;
     this.x = 0;
     this.y = 0;
   }
 
-  follow(target) {
+  follow(target, dtSeconds = 0) {
     const halfW = this.viewWidth / 2;
     const halfH = this.viewHeight / 2;
-    this.x = clamp(target.x - halfW, 0, Math.max(0, this.worldWidth - this.viewWidth));
-    this.y = clamp(target.y - halfH, 0, Math.max(0, this.worldHeight - this.viewHeight));
+    const desiredX = target.x - halfW;
+    const desiredY = target.y - halfH;
+    const maxX = Math.max(0, this.worldWidth - this.viewWidth);
+    const maxY = Math.max(0, this.worldHeight - this.viewHeight);
+
+    if (this.followMode === 'smooth' && dtSeconds > 0) {
+      const alpha = clamp(this.smoothFactor * dtSeconds, 0, 1);
+      this.x += (desiredX - this.x) * alpha;
+      this.y += (desiredY - this.y) * alpha;
+    } else {
+      this.x = desiredX;
+      this.y = desiredY;
+    }
+
+    this.x = clamp(this.x, 0, maxX);
+    this.y = clamp(this.y, 0, maxY);
   }
 
   worldToScreen(x, y) {
