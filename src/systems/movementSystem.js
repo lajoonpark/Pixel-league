@@ -35,6 +35,7 @@ function updateMinionMovement(minion, map, dtSeconds) {
     return;
   }
 
+  // Keep compatibility while lane data still exposes both start/end and point-based aliases.
   const laneCenterY = lane.start?.y ?? lane.points?.[0]?.y ?? lane.path?.[0]?.y;
   if (typeof laneCenterY !== 'number') {
     return;
