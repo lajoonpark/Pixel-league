@@ -29,7 +29,7 @@ function updateMinionMovement(minion, map, dtSeconds) {
   }
 
   if (minion.target) {
-    const targetAlive = minion.target.health > 0 && minion.target.alive;
+    const targetAlive = minion.target.health > 0;
     const inRange = distanceSquared(minion, minion.target) <= minion.attackRange * minion.attackRange;
     if (!targetAlive || !inRange) {
       minion.target = null;
