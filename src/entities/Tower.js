@@ -10,8 +10,8 @@ export class Tower {
     this.width = 26;
     this.height = 26;
     this.color = team === 'blue' ? '#2f7fff' : '#d84545';
-    this.hp = 300;
-    this.maxHp = 300;
+    this.health = 300;
+    this.maxHealth = 300;
     this.damage = 16;
     this.attackCooldownMs = 1200;
     this.lastAttackAt = 0;

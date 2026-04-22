@@ -16,7 +16,7 @@ export function combatSystem(entities, nowMs, attackRange) {
     let bestDist = Infinity;
 
     for (const candidate of entities) {
-      if (candidate === attacker || candidate.team === attacker.team || candidate.hp <= 0) {
+      if (candidate === attacker || candidate.team === attacker.team || candidate.health <= 0) {
         continue;
       }
       const dist = distanceSquared(attacker, candidate);
@@ -27,7 +27,7 @@ export function combatSystem(entities, nowMs, attackRange) {
     }
 
     if (target) {
-      target.hp -= attacker.damage;
+      target.health -= attacker.damage;
       attacker.lastAttackAt = nowMs;
     }
   }

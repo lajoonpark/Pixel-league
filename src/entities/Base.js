@@ -10,7 +10,7 @@ export class Base {
     this.width = 36;
     this.height = 36;
     this.color = team === 'blue' ? '#2053bf' : '#a92c2c';
-    this.hp = 600;
-    this.maxHp = 600;
+    this.health = 600;
+    this.maxHealth = 600;
   }
 }
