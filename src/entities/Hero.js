@@ -7,11 +7,15 @@ export class Hero {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.width = 20;
-    this.height = 20;
+    this.width = 24;
+    this.height = 24;
+    this.moveSpeed = 220;
     this.color = '#4aa8ff';
-    this.hp = 120;
-    this.maxHp = 120;
+    this.maxHealth = 120;
+    this.health = 120;
+    // Keep legacy aliases for compatibility with shared systems.
+    this.maxHp = this.maxHealth;
+    this.hp = this.health;
     this.damage = 18;
     this.attackCooldownMs = 700;
     this.lastAttackAt = 0;

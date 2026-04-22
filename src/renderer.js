@@ -10,6 +10,39 @@ export class Renderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
+  drawMap(map) {
+    const topLeft = this.camera.worldToScreen(map.x, map.y);
+
+    this.ctx.fillStyle = map.color;
+    this.ctx.fillRect(
+      Math.round(topLeft.x),
+      Math.round(topLeft.y),
+      map.width,
+      map.height
+    );
+
+    this.ctx.strokeStyle = map.borderColor;
+    this.ctx.lineWidth = map.borderWidth;
+    this.ctx.strokeRect(
+      Math.round(topLeft.x),
+      Math.round(topLeft.y),
+      map.width,
+      map.height
+    );
+
+    // Lanes are intentionally simple strips for prototype readability.
+    for (const lane of map.lanes) {
+      const lanePos = this.camera.worldToScreen(lane.x, lane.y);
+      this.ctx.fillStyle = '#2d3446';
+      this.ctx.fillRect(
+        Math.round(lanePos.x),
+        Math.round(lanePos.y),
+        lane.width,
+        lane.height
+      );
+    }
+  }
+
   drawRect(entity) {
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
     this.ctx.fillStyle = entity.color;
@@ -22,13 +55,15 @@ export class Renderer {
   }
 
   drawHealthBar(entity) {
-    if (typeof entity.hp !== 'number' || typeof entity.maxHp !== 'number') {
+    const hp = typeof entity.health === 'number' ? entity.health : entity.hp;
+    const maxHp = typeof entity.maxHealth === 'number' ? entity.maxHealth : entity.maxHp;
+    if (typeof hp !== 'number' || typeof maxHp !== 'number') {
       return;
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
     const barWidth = entity.width;
     const barHeight = 4;
-    const ratio = Math.max(0, entity.hp) / entity.maxHp;
+    const ratio = Math.max(0, hp) / maxHp;
 
     this.ctx.fillStyle = '#280a0a';
     this.ctx.fillRect(Math.round(x - barWidth / 2), Math.round(y - entity.height / 2 - 10), barWidth, barHeight);
