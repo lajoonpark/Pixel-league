@@ -24,7 +24,7 @@ export class Game {
   setupWorld() {
     // First playable scene: one hero starts near the left side of the map.
     const lane = this.map.lanes[0];
-    const spawnX = lane.x + CONFIG.gameplay.heroSpawnOffsetX;
+    const spawnX = lane.x + CONFIG.gameplay.heroSpawnLaneOffsetX;
     const spawnY = lane.y + lane.height / 2;
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
@@ -55,7 +55,7 @@ export class Game {
   }
 
   updateHeroVelocity() {
-    const speed = this.hero.moveSpeed;
+    const speed = this.hero.moveSpeed ?? CONFIG.gameplay.defaultHeroMoveSpeed;
     const moveX = (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight') ? 1 : 0)
       - (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft') ? 1 : 0);
     const moveY = (this.input.isPressed('KeyS') || this.input.isPressed('ArrowDown') ? 1 : 0)
