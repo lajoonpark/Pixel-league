@@ -35,7 +35,7 @@ export class Game {
     const spawnY = lane.y + lane.height / 2;
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
-    this.camera.follow(this.hero, 0);
+    this.camera.snapTo(this.hero);
   }
 
   start() {

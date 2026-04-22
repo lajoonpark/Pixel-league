@@ -13,25 +13,34 @@ export class Camera {
     this.y = 0;
   }
 
-  follow(target, dtSeconds = 0) {
+  getDesiredPosition(target) {
     const halfW = this.viewWidth / 2;
     const halfH = this.viewHeight / 2;
-    const desiredX = target.x - halfW;
-    const desiredY = target.y - halfH;
     const maxX = Math.max(0, this.worldWidth - this.viewWidth);
     const maxY = Math.max(0, this.worldHeight - this.viewHeight);
+    return {
+      x: clamp(target.x - halfW, 0, maxX),
+      y: clamp(target.y - halfH, 0, maxY),
+    };
+  }
+
+  snapTo(target) {
+    const desired = this.getDesiredPosition(target);
+    this.x = desired.x;
+    this.y = desired.y;
+  }
+
+  follow(target, dtSeconds) {
+    const desired = this.getDesiredPosition(target);
 
     if (this.followMode === 'smooth' && dtSeconds > 0) {
       const alpha = clamp(this.smoothFactor * dtSeconds, 0, 1);
-      this.x += (desiredX - this.x) * alpha;
-      this.y += (desiredY - this.y) * alpha;
+      this.x += (desired.x - this.x) * alpha;
+      this.y += (desired.y - this.y) * alpha;
     } else {
-      this.x = desiredX;
-      this.y = desiredY;
+      this.x = desired.x;
+      this.y = desired.y;
     }
-
-    this.x = clamp(this.x, 0, maxX);
-    this.y = clamp(this.y, 0, maxY);
   }
 
   worldToScreen(x, y) {
