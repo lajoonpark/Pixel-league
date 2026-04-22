@@ -5,6 +5,7 @@ import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
 import { Hero } from './entities/Hero.js';
 import { createMap } from './world/map.js';
+import { createSpawnSystem } from './systems/spawnSystem.js';
 import { movementSystem } from './systems/movementSystem.js';
 import { collisionSystem } from './systems/collisionSystem.js';
 
@@ -16,6 +17,7 @@ export class Game {
     this.camera = new Camera(canvas.width, canvas.height, this.map.width, this.map.height);
     this.renderer = new Renderer(canvas, this.camera);
     this.entities = [];
+    this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
     this.lastFrameAt = 0;
     this.fps = 0;
 
@@ -51,6 +53,7 @@ export class Game {
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
+    this.spawnSystem(this, dtMs);
     movementSystem(this.entities, dtSeconds);
     collisionSystem(this.entities, this.map);
     this.camera.follow(this.hero);
