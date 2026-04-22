@@ -13,6 +13,9 @@ export function createSpawnSystem({
 
   function scheduleWave(game) {
     const lane = game.map.lanes[0];
+    if (!lane) {
+      return;
+    }
     const laneY = lane.start.y;
     const blueSide = game.map.sides.find((side) => side.team === 'blue');
     const redSide = game.map.sides.find((side) => side.team === 'red');
