@@ -8,6 +8,8 @@ import { createMap } from './world/map.js';
 import { createSpawnSystem } from './systems/spawnSystem.js';
 import { movementSystem } from './systems/movementSystem.js';
 import { collisionSystem } from './systems/collisionSystem.js';
+import { combatSystem } from './systems/combatSystem.js';
+import { healthSystem } from './systems/healthSystem.js';
 
 export class Game {
   constructor(canvas) {
@@ -44,18 +46,20 @@ export class Game {
   loop(timestamp) {
     const dtMs = timestamp - this.lastFrameAt;
     this.lastFrameAt = timestamp;
-    this.update(dtMs);
+    this.update(dtMs, timestamp);
     this.render();
     requestAnimationFrame((nextTimestamp) => this.loop(nextTimestamp));
   }
 
-  update(dtMs) {
+  update(dtMs, nowMs) {
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
     this.spawnSystem(this, dtMs);
+    combatSystem(this.entities, nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
+    healthSystem(this.entities);
     this.camera.follow(this.hero);
   }
 

@@ -1,4 +1,6 @@
 // Movement system updates entity positions based on velocity.
+import { distanceSquared } from '../utils.js';
+
 function getLaneForMinion(minion, map) {
   const lanes = map?.lanes ?? [];
   if (lanes.length === 0) {
@@ -27,6 +29,16 @@ function updateMinionMovement(minion, map, dtSeconds) {
   }
 
   if (minion.target) {
+    const targetAlive = minion.target.health > 0;
+    const inRange = distanceSquared(minion, minion.target) <= minion.attackRange * minion.attackRange;
+    if (!targetAlive || !inRange) {
+      minion.target = null;
+    }
+  }
+
+  if (minion.target) {
+    minion.vx = 0;
+    minion.vy = 0;
     return;
   }
 

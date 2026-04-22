@@ -1,34 +1,56 @@
-// Combat system applies simple nearest-target auto attacks.
+// Combat system applies simple nearest-target auto attacks for minions.
 import { distanceSquared } from '../utils.js';
 
-export function combatSystem(entities, nowMs, attackRange) {
-  const rangeSq = attackRange * attackRange;
+function isLivingMinion(entity) {
+  return entity?.type === 'minion' && entity.alive && entity.health > 0;
+}
 
+function isValidTarget(attacker, target) {
+  return isLivingMinion(target) && target.team !== attacker.team;
+}
+
+export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
-    if (typeof attacker.damage !== 'number' || typeof attacker.attackCooldownMs !== 'number') {
+    if (!isLivingMinion(attacker)) {
       continue;
     }
+
+    const attackRangeSq = attacker.attackRange * attacker.attackRange;
+    const currentTargetInRange = (
+      isValidTarget(attacker, attacker.target)
+      && distanceSquared(attacker, attacker.target) <= attackRangeSq
+    );
+
+    let nearestTarget = currentTargetInRange ? attacker.target : null;
+    let nearestDistanceSq = currentTargetInRange
+      ? distanceSquared(attacker, attacker.target)
+      : Infinity;
+
+    for (const candidate of entities) {
+      if (!isValidTarget(attacker, candidate)) {
+        continue;
+      }
+      if (candidate === attacker.target && currentTargetInRange) {
+        continue;
+      }
+
+      const distSq = distanceSquared(attacker, candidate);
+      if (distSq <= attackRangeSq && distSq < nearestDistanceSq) {
+        nearestDistanceSq = distSq;
+        nearestTarget = candidate;
+      }
+    }
+
+    attacker.target = nearestTarget;
+    if (!attacker.target) {
+      continue;
+    }
+
     if (nowMs - attacker.lastAttackAt < attacker.attackCooldownMs) {
       continue;
     }
 
-    let target = null;
-    let bestDist = Infinity;
-
-    for (const candidate of entities) {
-      if (candidate === attacker || candidate.team === attacker.team || candidate.health <= 0) {
-        continue;
-      }
-      const dist = distanceSquared(attacker, candidate);
-      if (dist <= rangeSq && dist < bestDist) {
-        bestDist = dist;
-        target = candidate;
-      }
-    }
-
-    if (target) {
-      target.health -= attacker.damage;
-      attacker.lastAttackAt = nowMs;
-    }
+    attacker.target.health = Math.max(0, attacker.target.health - attacker.attackDamage);
+    attacker.lastAttackAt = nowMs;
   }
 }

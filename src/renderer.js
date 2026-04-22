@@ -98,7 +98,13 @@ export class Renderer {
   }
 
   drawHealthBar(entity) {
-    if (typeof entity.health !== 'number' || typeof entity.maxHealth !== 'number') {
+    if (
+      entity.type !== 'minion'
+      || !entity.alive
+      || entity.health <= 0
+      || typeof entity.health !== 'number'
+      || typeof entity.maxHealth !== 'number'
+    ) {
       return;
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
