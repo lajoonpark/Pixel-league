@@ -10,8 +10,8 @@ export class Minion {
     this.width = 14;
     this.height = 14;
     this.color = team === 'blue' ? '#7fc5ff' : '#ff8a8a';
-    this.hp = 45;
-    this.maxHp = 45;
+    this.health = 45;
+    this.maxHealth = 45;
     this.damage = 8;
     this.attackCooldownMs = 1000;
     this.lastAttackAt = 0;

@@ -7,10 +7,13 @@ export const CONFIG = {
   world: {
     width: 2000,
     height: 1200,
+    laneInset: 120,
+    laneHeight: 96,
   },
   gameplay: {
     minionSpawnIntervalMs: 3000,
     heroSpeed: 220,
+    heroSpawnOffsetFromLaneStart: 60,
     minionSpeed: 90,
     attackRange: 28,
     attackDamage: 10,

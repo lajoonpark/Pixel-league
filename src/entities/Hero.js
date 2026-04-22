@@ -13,9 +13,6 @@ export class Hero {
     this.color = '#4aa8ff';
     this.maxHealth = 120;
     this.health = 120;
-    // Keep legacy aliases for compatibility with shared systems.
-    this.maxHp = this.maxHealth;
-    this.hp = this.health;
     this.damage = 18;
     this.attackCooldownMs = 700;
     this.lastAttackAt = 0;

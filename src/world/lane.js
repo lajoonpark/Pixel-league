@@ -1,7 +1,7 @@
 // Lane definitions for top-down lane-based MOBA movement.
 export function createMainLane(world) {
-  const inset = 120;
-  const laneHeight = 96;
+  const inset = world.laneInset;
+  const laneHeight = world.laneHeight;
   return {
     id: 'mid',
     x: inset,

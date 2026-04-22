@@ -55,15 +55,13 @@ export class Renderer {
   }
 
   drawHealthBar(entity) {
-    const hp = typeof entity.health === 'number' ? entity.health : entity.hp;
-    const maxHp = typeof entity.maxHealth === 'number' ? entity.maxHealth : entity.maxHp;
-    if (typeof hp !== 'number' || typeof maxHp !== 'number') {
+    if (typeof entity.health !== 'number' || typeof entity.maxHealth !== 'number') {
       return;
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
     const barWidth = entity.width;
     const barHeight = 4;
-    const ratio = Math.max(0, hp) / maxHp;
+    const ratio = Math.max(0, entity.health) / entity.maxHealth;
 
     this.ctx.fillStyle = '#280a0a';
     this.ctx.fillRect(Math.round(x - barWidth / 2), Math.round(y - entity.height / 2 - 10), barWidth, barHeight);

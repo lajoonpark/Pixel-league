@@ -23,8 +23,9 @@ export class Game {
 
   setupWorld() {
     // First playable scene: one hero starts near the left side of the map.
-    const spawnX = 180;
-    const spawnY = this.map.height / 2;
+    const lane = this.map.lanes[0];
+    const spawnX = lane.x + CONFIG.gameplay.heroSpawnOffsetFromLaneStart;
+    const spawnY = lane.y + lane.height / 2;
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
   }
