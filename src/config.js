@@ -12,7 +12,6 @@ export const CONFIG = {
   },
   gameplay: {
     minionSpawnIntervalMs: 3000,
-    heroSpeed: 220,
     heroSpawnOffsetFromLaneStart: 60,
     minionSpeed: 90,
     attackRange: 28,

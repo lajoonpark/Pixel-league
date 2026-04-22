@@ -11,8 +11,8 @@ export class Hero {
     this.height = 24;
     this.moveSpeed = 220;
     this.color = '#4aa8ff';
-    this.maxHealth = 120;
     this.health = 120;
+    this.maxHealth = 120;
     this.damage = 18;
     this.attackCooldownMs = 700;
     this.lastAttackAt = 0;
