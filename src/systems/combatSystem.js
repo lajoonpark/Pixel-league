@@ -40,7 +40,7 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (nowMs - attacker.lastAttackAt < attacker.attackCooldown) {
+    if (nowMs - attacker.lastAttackAt < attacker.attackCooldownMs) {
       continue;
     }
 
