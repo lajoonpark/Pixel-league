@@ -15,9 +15,9 @@ export function createSpawnSystem(intervalMs) {
     const start = lane.points[0];
     const end = lane.points[lane.points.length - 1];
 
-    game.entities.push(new Minion(start.x + 24, start.y - 20, 'blue'));
-    game.entities.push(new Minion(start.x + 24, start.y + 20, 'blue'));
-    game.entities.push(new Minion(end.x - 24, end.y - 20, 'red'));
-    game.entities.push(new Minion(end.x - 24, end.y + 20, 'red'));
+    game.entities.push(new Minion(start.x + 24, start.y - 20, 'blue', lane.id, 0));
+    game.entities.push(new Minion(start.x + 24, start.y + 20, 'blue', lane.id, 0));
+    game.entities.push(new Minion(end.x - 24, end.y - 20, 'red', lane.id, 0));
+    game.entities.push(new Minion(end.x - 24, end.y + 20, 'red', lane.id, 0));
   };
 }
