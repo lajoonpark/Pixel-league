@@ -35,15 +35,20 @@ export function createSpawnSystem({
   }
 
   function flushScheduledSpawns(game, dtMs) {
-    for (let spawnIndex = scheduledSpawns.length - 1; spawnIndex >= 0; spawnIndex -= 1) {
-      const scheduled = scheduledSpawns[spawnIndex];
-      scheduled.delayMs -= dtMs;
-      if (scheduled.delayMs > 0) {
+    const pendingSpawns = [];
+    for (const scheduled of scheduledSpawns) {
+      const remainingDelayMs = scheduled.delayMs - dtMs;
+      if (remainingDelayMs > 0) {
+        scheduled.delayMs = remainingDelayMs;
+        pendingSpawns.push(scheduled);
         continue;
       }
+
       game.entities.push(new Minion(scheduled.x, scheduled.y, scheduled.team));
-      scheduledSpawns.splice(spawnIndex, 1);
     }
+
+    scheduledSpawns.length = 0;
+    scheduledSpawns.push(...pendingSpawns);
   }
 
   const spawnSystem = function spawnSystem(game, dtMs) {
