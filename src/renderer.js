@@ -1,4 +1,6 @@
 // Renderer wraps low-level canvas drawing operations.
+const CENTER_LINE_HEIGHT = 4;
+
 export class Renderer {
   constructor(canvas, camera) {
     this.canvas = canvas;
@@ -52,12 +54,12 @@ export class Renderer {
       );
 
       this.ctx.fillStyle = '#7f89a5';
-      const centerStart = this.camera.worldToScreen(lane.start.x, lane.start.y - 2);
+      const centerStart = this.camera.worldToScreen(lane.start.x, lane.start.y - CENTER_LINE_HEIGHT / 2);
       this.ctx.fillRect(
         Math.round(centerStart.x),
         Math.round(centerStart.y),
         lane.end.x - lane.start.x,
-        4
+        CENTER_LINE_HEIGHT
       );
 
       for (const towerSlot of lane.placeholders?.towerSlots ?? []) {

@@ -1,4 +1,7 @@
 // Lane and world layout data for a one-lane MOBA map.
+const BASE_INSET_MULTIPLIER = 0.45;
+const OUTER_TOWER_INSET_MULTIPLIER = 2.1;
+
 export function createMainLane(world) {
   const centerY = world.height / 2;
   const laneWidth = world.laneHeight;
@@ -6,7 +9,7 @@ export function createMainLane(world) {
   const end = { x: world.width, y: centerY };
   const centerLine = [start, end];
 
-  const baseInset = world.laneInset * 0.45;
+  const baseInset = world.laneInset * BASE_INSET_MULTIPLIER;
   const towerInset = world.laneInset;
 
   return {
@@ -15,6 +18,7 @@ export function createMainLane(world) {
     end,
     width: laneWidth,
     centerLine,
+    // Keep legacy aliases while spawn/pathing systems are still converging.
     points: centerLine,
     path: centerLine,
     bounds: {
@@ -46,7 +50,7 @@ export function createMainLane(world) {
         {
           id: 'allied-outer-tower',
           team: 'blue',
-          x: towerInset * 2.1,
+          x: towerInset * OUTER_TOWER_INSET_MULTIPLIER,
           y: centerY,
           width: 32,
           height: 52,
@@ -70,7 +74,7 @@ export function createMainLane(world) {
         {
           id: 'enemy-outer-tower',
           team: 'red',
-          x: world.width - towerInset * 2.1,
+          x: world.width - towerInset * OUTER_TOWER_INSET_MULTIPLIER,
           y: centerY,
           width: 32,
           height: 52,
