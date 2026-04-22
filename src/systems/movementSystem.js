@@ -1,5 +1,5 @@
 // Movement system updates entity positions based on velocity.
-import { distanceSquared } from '../utils.js';
+import { clamp, distanceSquared } from '../utils.js';
 
 function getLaneForMinion(minion, map) {
   const lanes = map?.lanes ?? [];
@@ -54,9 +54,11 @@ function updateMinionMovement(minion, map, dtSeconds) {
   }
   const moveDirection = minion.team === 'blue' ? 1 : -1;
   minion.vx = moveDirection * minion.moveSpeed;
-  minion.vy = 0;
+  const laneOffsetY = laneCenterY - minion.y;
+  const laneCorrectionSpeed = minion.moveSpeed * 0.6;
+  minion.vy = clamp(laneOffsetY * 5, -laneCorrectionSpeed, laneCorrectionSpeed);
   minion.x += minion.vx * dtSeconds;
-  minion.y = laneCenterY;
+  minion.y += minion.vy * dtSeconds;
 }
 
 export function movementSystem(entities, map, dtSeconds) {
