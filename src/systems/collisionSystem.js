@@ -3,7 +3,11 @@ import { clamp } from '../utils.js';
 
 export function collisionSystem(entities, map) {
   for (const entity of entities) {
-    entity.x = clamp(entity.x, entity.width / 2, map.width - entity.width / 2);
-    entity.y = clamp(entity.y, entity.height / 2, map.height - entity.height / 2);
+    const minX = map.x + entity.width / 2;
+    const maxX = map.x + map.width - entity.width / 2;
+    const minY = map.y + entity.height / 2;
+    const maxY = map.y + map.height - entity.height / 2;
+    entity.x = clamp(entity.x, minX, maxX);
+    entity.y = clamp(entity.y, minY, maxY);
   }
 }

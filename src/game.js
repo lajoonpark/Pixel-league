@@ -17,6 +17,7 @@ export class Game {
     this.renderer = new Renderer(canvas, this.camera);
     this.entities = [];
     this.lastFrameAt = 0;
+    this.fps = 0;
 
     this.setupWorld();
   }
@@ -48,6 +49,7 @@ export class Game {
 
   update(dtMs) {
     const dtSeconds = dtMs / 1000;
+    this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
     movementSystem(this.entities, dtSeconds);
     collisionSystem(this.entities, this.map);
@@ -56,13 +58,16 @@ export class Game {
 
   updateHeroVelocity() {
     const speed = this.hero.moveSpeed ?? CONFIG.gameplay.defaultHeroMoveSpeed;
-    const moveX = (this.input.isPressed('KeyD') || this.input.isPressed('ArrowRight') ? 1 : 0)
-      - (this.input.isPressed('KeyA') || this.input.isPressed('ArrowLeft') ? 1 : 0);
-    const moveY = (this.input.isPressed('KeyS') || this.input.isPressed('ArrowDown') ? 1 : 0)
-      - (this.input.isPressed('KeyW') || this.input.isPressed('ArrowUp') ? 1 : 0);
+    const move = this.input.getMoveIntent();
+    const magnitude = Math.hypot(move.x, move.y);
+    if (magnitude === 0) {
+      this.hero.vx = 0;
+      this.hero.vy = 0;
+      return;
+    }
 
-    this.hero.vx = moveX * speed;
-    this.hero.vy = moveY * speed;
+    this.hero.vx = (move.x / magnitude) * speed;
+    this.hero.vy = (move.y / magnitude) * speed;
   }
 
   render() {
@@ -76,5 +81,11 @@ export class Game {
 
     this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);
     this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 44);
+    this.renderer.drawText(
+      `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
+      12,
+      60,
+      { font: '10px monospace', color: '#b9c5d6' }
+    );
   }
 }

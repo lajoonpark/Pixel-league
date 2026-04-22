@@ -74,9 +74,9 @@ export class Renderer {
     );
   }
 
-  drawText(text, x, y) {
-    this.ctx.fillStyle = '#d0d7e2';
-    this.ctx.font = '14px monospace';
+  drawText(text, x, y, options = {}) {
+    this.ctx.fillStyle = options.color ?? '#d0d7e2';
+    this.ctx.font = options.font ?? '14px monospace';
     this.ctx.fillText(text, x, y);
   }
 }
