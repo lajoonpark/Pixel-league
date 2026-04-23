@@ -9,12 +9,20 @@ function isLivingTower(entity) {
   return entity?.type === 'tower' && entity.alive && entity.health > 0;
 }
 
+function isLivingBase(entity) {
+  return entity?.type === 'base' && entity.alive && entity.health > 0;
+}
+
 function isCombatAttacker(entity) {
   return isLivingMinion(entity) || isLivingTower(entity);
 }
 
 function isValidTarget(attacker, target) {
-  return isLivingMinion(target) && target.team !== attacker.team;
+  if (!target || target.team === attacker.team) {
+    return false;
+  }
+
+  return isLivingMinion(target) || isLivingTower(target) || isLivingBase(target);
 }
 
 function getAttackCooldown(attacker) {
