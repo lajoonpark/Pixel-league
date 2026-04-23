@@ -11,7 +11,6 @@ export function healthSystem(entities, nowMs) {
       if (entity.type === 'hero') {
         if (entity.alive) {
           entity.alive = false;
-          entity.deathAtMs = nowMs;
         }
         continue;
       }

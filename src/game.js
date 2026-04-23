@@ -203,7 +203,6 @@ export class Game {
     this.hero.alive = true;
     this.hero.target = null;
     this.hero.isAttackRequested = false;
-    this.hero.deathAtMs = 0;
     this.hero.respawnAtMs = 0;
   }
 

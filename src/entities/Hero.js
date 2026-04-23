@@ -19,7 +19,6 @@ export class Hero {
     this.attackCooldown = 700;
     this.lastAttackTime = 0;
     this.isAttackRequested = false;
-    this.deathAtMs = 0;
     this.respawnAtMs = 0;
   }
 }
