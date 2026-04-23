@@ -14,7 +14,7 @@ function isLivingBase(entity) {
 }
 
 function isLivingHero(entity) {
-  return entity?.type === 'hero' && entity.health > 0;
+  return entity?.type === 'hero' && entity.alive && entity.health > 0;
 }
 
 function isCombatAttacker(entity) {
@@ -26,7 +26,12 @@ function isValidTarget(attacker, target) {
     return false;
   }
 
-  return isLivingMinion(target) || isLivingTower(target) || isLivingBase(target);
+  return (
+    isLivingMinion(target)
+    || isLivingTower(target)
+    || isLivingBase(target)
+    || isLivingHero(target)
+  );
 }
 
 function getAttackCooldown(attacker) {

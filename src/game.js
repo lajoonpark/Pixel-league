@@ -34,8 +34,7 @@ export class Game {
   setupWorld() {
     // First playable scene: one hero and one tower per side on the lane.
     const lane = this.map.lanes[0];
-    const spawnX = lane.start.x + CONFIG.gameplay.heroSpawnLaneOffsetX;
-    const spawnY = lane.start.y;
+    const { x: spawnX, y: spawnY } = this.getAlliedHeroSpawnPoint();
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
 
@@ -71,6 +70,14 @@ export class Game {
       );
       this.entities.push(this.enemyBase);
     }
+  }
+
+  getAlliedHeroSpawnPoint() {
+    const lane = this.map.lanes[0];
+    return {
+      x: lane.start.x + CONFIG.gameplay.heroSpawnLaneOffsetX,
+      y: lane.start.y,
+    };
   }
 
   resetMatch() {
@@ -138,7 +145,7 @@ export class Game {
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
     const attackPressed = this.input.isAttackPressed();
-    if (attackPressed && !this.wasAttackPressed) {
+    if (this.hero.alive && attackPressed && !this.wasAttackPressed) {
       this.hero.isAttackRequested = true;
     }
     this.wasAttackPressed = attackPressed;
@@ -146,12 +153,20 @@ export class Game {
     combatSystem(this.entities, nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
-    healthSystem(this.entities);
+    healthSystem(this.entities, nowMs);
+    this.updateHeroRespawn(nowMs);
     this.checkWinCondition();
     this.camera.follow(this.hero);
   }
 
   updateHeroVelocity() {
+    if (!this.hero.alive) {
+      this.hero.vx = 0;
+      this.hero.vy = 0;
+      this.hero.isAttackRequested = false;
+      return;
+    }
+
     const speed = this.hero.moveSpeed ?? CONFIG.gameplay.defaultHeroMoveSpeed;
     const move = this.input.getMoveIntent();
     const magnitude = Math.hypot(move.x, move.y);
@@ -163,6 +178,34 @@ export class Game {
 
     this.hero.vx = (move.x / magnitude) * speed;
     this.hero.vy = (move.y / magnitude) * speed;
+  }
+
+  updateHeroRespawn(nowMs) {
+    if (this.hero.alive) {
+      this.hero.respawnAtMs = 0;
+      return;
+    }
+
+    if (!this.hero.respawnAtMs) {
+      this.hero.respawnAtMs = nowMs + CONFIG.gameplay.heroRespawnDelayMs;
+      return;
+    }
+
+    if (nowMs < this.hero.respawnAtMs) {
+      return;
+    }
+
+    const spawnPoint = this.getAlliedHeroSpawnPoint();
+    this.hero.x = spawnPoint.x;
+    this.hero.y = spawnPoint.y;
+    this.hero.vx = 0;
+    this.hero.vy = 0;
+    this.hero.health = this.hero.maxHealth;
+    this.hero.alive = true;
+    this.hero.target = null;
+    this.hero.isAttackRequested = false;
+    this.hero.deathAtMs = 0;
+    this.hero.respawnAtMs = 0;
   }
 
   render() {
@@ -193,6 +236,15 @@ export class Game {
       104,
       { font: '10px monospace', color: '#b9c5d6' }
     );
+    if (!this.hero.alive) {
+      const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
+      this.renderer.drawText(
+        `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
+        12,
+        120,
+        { font: '10px monospace', color: '#ffb3b3' }
+      );
+    }
 
     if (this.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');
