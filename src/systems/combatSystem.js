@@ -1,4 +1,4 @@
-// Combat system applies simple nearest-target auto attacks for minions.
+// Combat system applies auto-attacks with targeting priority rules.
 import { distanceSquared } from '../utils.js';
 
 function isLivingMinion(entity) {
@@ -17,8 +17,9 @@ function isLivingHero(entity) {
   return entity?.type === 'hero' && entity.alive && entity.health > 0;
 }
 
+// Towers, bases, minions and the hero all participate in combat as attackers.
 function isCombatAttacker(entity) {
-  return isLivingMinion(entity) || isLivingTower(entity) || isLivingHero(entity);
+  return isLivingMinion(entity) || isLivingTower(entity) || isLivingHero(entity) || isLivingBase(entity);
 }
 
 function isValidTarget(attacker, target) {
@@ -34,6 +35,12 @@ function isValidTarget(attacker, target) {
   );
 }
 
+// True when enemy towers are still alive (minions may not target the base yet).
+function hasAliveEnemyTowers(attacker, entities) {
+  const enemyTeam = attacker.team === 'blue' ? 'red' : 'blue';
+  return entities.some((e) => isLivingTower(e) && e.team === enemyTeam);
+}
+
 function getAttackCooldown(attacker) {
   return attacker.attackCooldownMs ?? attacker.attackCooldown ?? 0;
 }
@@ -44,6 +51,60 @@ function getLastAttackTime(attacker) {
 
 function setLastAttackTime(attacker, nowMs) {
   attacker.lastAttackMs = nowMs;
+}
+
+// Selects the best target for the given attacker within attackRangeSq.
+// Towers and bases always prefer the nearest minion; they only fall back to
+// the hero when no minion is in range.  Minions may not target the enemy base
+// while any enemy tower is still standing.  The hero has no restrictions.
+function findBestTarget(attacker, entities, attackRangeSq) {
+  const isStructure = attacker.type === 'tower' || attacker.type === 'base';
+  const isMinion = attacker.type === 'minion';
+  const enemyTowersAlive = isMinion ? hasAliveEnemyTowers(attacker, entities) : false;
+
+  let bestMinion = null;
+  let bestMinionDistSq = Infinity;
+  let bestOther = null;
+  let bestOtherDistSq = Infinity;
+
+  for (const candidate of entities) {
+    if (!isValidTarget(attacker, candidate)) {
+      continue;
+    }
+
+    // Minions cannot target the enemy base until all enemy towers are destroyed.
+    if (isMinion && candidate.type === 'base' && enemyTowersAlive) {
+      continue;
+    }
+
+    const distSq = distanceSquared(attacker, candidate);
+    if (distSq > attackRangeSq) {
+      continue;
+    }
+
+    if (isLivingMinion(candidate)) {
+      if (distSq < bestMinionDistSq) {
+        bestMinionDistSq = distSq;
+        bestMinion = candidate;
+      }
+    } else {
+      if (distSq < bestOtherDistSq) {
+        bestOtherDistSq = distSq;
+        bestOther = candidate;
+      }
+    }
+  }
+
+  if (isStructure) {
+    // Structures always prefer minions over every other target type.
+    return bestMinion ?? bestOther;
+  }
+
+  // Hero and minions: pick the nearest valid target regardless of type.
+  if (bestMinionDistSq <= bestOtherDistSq) {
+    return bestMinion;
+  }
+  return bestOther;
 }
 
 export function combatSystem(entities, nowMs) {
@@ -61,32 +122,10 @@ export function combatSystem(entities, nowMs) {
     }
 
     const attackRangeSq = attacker.attackRange * attacker.attackRange;
-    const currentTargetInRange = (
-      isValidTarget(attacker, attacker.target)
-      && distanceSquared(attacker, attacker.target) <= attackRangeSq
-    );
 
-    let nearestTarget = currentTargetInRange ? attacker.target : null;
-    let nearestDistanceSq = currentTargetInRange
-      ? distanceSquared(attacker, attacker.target)
-      : Infinity;
+    // Re-evaluate target every frame so priority rules are always applied.
+    attacker.target = findBestTarget(attacker, entities, attackRangeSq);
 
-    for (const candidate of entities) {
-      if (!isValidTarget(attacker, candidate)) {
-        continue;
-      }
-      if (candidate === attacker.target && currentTargetInRange) {
-        continue;
-      }
-
-      const distSq = distanceSquared(attacker, candidate);
-      if (distSq <= attackRangeSq && distSq < nearestDistanceSq) {
-        nearestDistanceSq = distSq;
-        nearestTarget = candidate;
-      }
-    }
-
-    attacker.target = nearestTarget;
     if (!attacker.target) {
       continue;
     }

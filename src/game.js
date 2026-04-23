@@ -33,20 +33,15 @@ export class Game {
   }
 
   setupWorld() {
-    // First playable scene: one hero and one tower per side on the lane.
+    // Build the scene from all tower and base slots defined in the lane.
     const lane = this.map.lanes[0];
     const { x: spawnX, y: spawnY } = this.getAlliedHeroSpawnPoint();
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
 
-    const alliedTowerSlot = lane.placeholders?.towerSlots?.find((slot) => slot.team === 'blue');
-    const enemyTowerSlot = lane.placeholders?.towerSlots?.find((slot) => slot.team === 'red');
-
-    if (alliedTowerSlot) {
-      this.entities.push(new Tower(alliedTowerSlot.x, alliedTowerSlot.y, alliedTowerSlot.team));
-    }
-    if (enemyTowerSlot) {
-      this.entities.push(new Tower(enemyTowerSlot.x, enemyTowerSlot.y, enemyTowerSlot.team));
+    // Create every tower slot (blue-outer, blue-inner, red-inner, red-outer).
+    for (const slot of lane.placeholders?.towerSlots ?? []) {
+      this.entities.push(new Tower(slot.x, slot.y, slot.team));
     }
 
     const alliedBaseSlot = lane.placeholders?.baseSlots?.find((slot) => slot.team === 'blue');
@@ -154,6 +149,10 @@ export class Game {
       this.hero.isAttackRequested = true;
     }
     this.wasAttackPressed = attackPressed;
+
+    // Show the hero's attack-range circle while Space is held.
+    this.hero.showRangeCircle = this.hero.alive && attackPressed;
+
     this.spawnSystem.update(this, dtMs);
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
@@ -161,6 +160,7 @@ export class Game {
     collisionSystem(this.entities, this.map);
     healthSystem(this.entities, nowMs);
     this.updateHeroRespawn(nowMs);
+    this.applyBaseProximityHeal();
     this.checkWinCondition();
     this.camera.follow(this.hero);
   }
@@ -186,8 +186,26 @@ export class Game {
     this.hero.vy = (move.y / magnitude) * speed;
   }
 
-  updateHeroRespawn(nowMs) {
-    if (this.hero.alive) {
+  // Instantly restores the hero to full health when they are standing near the
+  // allied base.  Only applies to a living hero with missing health.
+  applyBaseProximityHeal() {
+    if (
+      !this.hero.alive
+      || this.hero.health >= this.hero.maxHealth
+      || !this.alliedBase?.alive
+      || this.alliedBase.health <= 0
+    ) {
+      return;
+    }
+    const dx = this.hero.x - this.alliedBase.x;
+    const dy = this.hero.y - this.alliedBase.y;
+    const healRadius = CONFIG.base.healRadius;
+    if (dx * dx + dy * dy <= healRadius * healRadius) {
+      this.hero.health = this.hero.maxHealth;
+    }
+  }
+
+  updateHeroRespawn(nowMs) {    if (this.hero.alive) {
       return;
     }
 

@@ -12,18 +12,97 @@ export class Renderer {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
+  // ── map ──────────────────────────────────────────────────────────────────────
+
   drawMap(map) {
+    this.drawTiledBackground(map);
+    this.drawDecorations(map);
+    this.drawLaneCenterLines(map);
+    this.drawMapBorder(map);
+  }
+
+  // Render only the tiles that overlap the current viewport for performance.
+  drawTiledBackground(map) {
+    const tileSize = 32;
+    const camX = this.camera.x;
+    const camY = this.camera.y;
+    const viewW = this.camera.viewWidth;
+    const viewH = this.camera.viewHeight;
+
+    const startTX = Math.floor(camX / tileSize);
+    const startTY = Math.floor(camY / tileSize);
+    const endTX = Math.ceil((camX + viewW) / tileSize);
+    const endTY = Math.ceil((camY + viewH) / tileSize);
+
+    const grassSprite = this.spriteRegistry['tile-grass']?.image;
+    const laneSprite = this.spriteRegistry['tile-lane']?.image;
+
+    const laneBounds = map.lanes?.[0]?.bounds;
+    const laneMinY = laneBounds ? laneBounds.y : (map.height / 2 - map.laneHeight / 2);
+    const laneMaxY = laneBounds ? laneBounds.y + laneBounds.height : (map.height / 2 + map.laneHeight / 2);
+
+    for (let ty = startTY; ty <= endTY; ty += 1) {
+      const wy = ty * tileSize;
+      if (wy < 0 || wy >= map.height) { continue; }
+
+      for (let tx = startTX; tx <= endTX; tx += 1) {
+        const wx = tx * tileSize;
+        if (wx < 0 || wx >= map.width) { continue; }
+
+        const { x: sx, y: sy } = this.camera.worldToScreen(wx, wy);
+        const inLane = wy < laneMaxY && wy + tileSize > laneMinY;
+        const sprite = inLane ? laneSprite : grassSprite;
+
+        if (sprite) {
+          this.ctx.drawImage(sprite, Math.round(sx), Math.round(sy), tileSize, tileSize);
+        } else {
+          this.ctx.fillStyle = inLane ? '#9a7a50' : '#3a7d30';
+          this.ctx.fillRect(Math.round(sx), Math.round(sy), tileSize, tileSize);
+        }
+      }
+    }
+  }
+
+  // Draw tree decorations from the map's decoration list.
+  drawDecorations(map) {
+    const treeSprite = this.spriteRegistry['tree']?.image;
+    const TW = 28;
+    const TH = 38;
+
+    for (const deco of map.decorations ?? []) {
+      const { x: sx, y: sy } = this.camera.worldToScreen(deco.x, deco.y);
+      // Simple frustum cull.
+      if (sx + TW < 0 || sx - TW > this.canvas.width) { continue; }
+      if (sy + TH < 0 || sy - TH > this.canvas.height) { continue; }
+
+      if (treeSprite) {
+        this.ctx.drawImage(treeSprite, Math.round(sx - TW / 2), Math.round(sy - TH / 2), TW, TH);
+      } else {
+        this.ctx.fillStyle = '#2a6020';
+        this.ctx.fillRect(Math.round(sx - 8), Math.round(sy - 12), 16, 24);
+      }
+    }
+  }
+
+  drawLaneCenterLines(map) {
+    const lineH = this.config.rendering.laneCenterLineHeight;
+    this.ctx.fillStyle = this.config.map.colors.laneCenterLine;
+    for (const lane of map.lanes ?? []) {
+      const pos = this.camera.worldToScreen(
+        lane.start.x,
+        lane.start.y - lineH / 2
+      );
+      this.ctx.fillRect(
+        Math.round(pos.x),
+        Math.round(pos.y),
+        lane.end.x - lane.start.x,
+        lineH
+      );
+    }
+  }
+
+  drawMapBorder(map) {
     const topLeft = this.camera.worldToScreen(map.x, map.y);
-    const mapColors = this.config.map.colors;
-
-    this.ctx.fillStyle = map.color;
-    this.ctx.fillRect(
-      Math.round(topLeft.x),
-      Math.round(topLeft.y),
-      map.width,
-      map.height
-    );
-
     this.ctx.strokeStyle = map.borderColor;
     this.ctx.lineWidth = map.borderWidth;
     this.ctx.strokeRect(
@@ -32,69 +111,40 @@ export class Renderer {
       map.width,
       map.height
     );
-
-    for (const side of map.sides ?? []) {
-      const sidePos = this.camera.worldToScreen(side.x, side.y);
-      this.ctx.fillStyle = side.team === 'blue'
-        ? mapColors.alliedSide
-        : mapColors.enemySide;
-      this.ctx.fillRect(
-        Math.round(sidePos.x),
-        Math.round(sidePos.y),
-        side.width,
-        side.height
-      );
-    }
-
-    for (const lane of map.lanes) {
-      const lanePos = this.camera.worldToScreen(lane.bounds.x, lane.bounds.y);
-      this.ctx.fillStyle = mapColors.lane;
-      this.ctx.fillRect(
-        Math.round(lanePos.x),
-        Math.round(lanePos.y),
-        lane.bounds.width,
-        lane.bounds.height
-      );
-
-      this.ctx.fillStyle = mapColors.laneCenterLine;
-      const centerStart = this.camera.worldToScreen(
-        lane.start.x,
-        lane.start.y - this.config.rendering.laneCenterLineHeight / 2
-      );
-      this.ctx.fillRect(
-        Math.round(centerStart.x),
-        Math.round(centerStart.y),
-        lane.end.x - lane.start.x,
-        this.config.rendering.laneCenterLineHeight
-      );
-
-      for (const towerSlot of lane.placeholders?.towerSlots ?? []) {
-        const towerPos = this.camera.worldToScreen(towerSlot.x - towerSlot.width / 2, towerSlot.y - towerSlot.height / 2);
-        this.ctx.fillStyle = towerSlot.team === 'blue'
-          ? mapColors.alliedTowerSlot
-          : mapColors.enemyTowerSlot;
-        this.ctx.fillRect(
-          Math.round(towerPos.x),
-          Math.round(towerPos.y),
-          towerSlot.width,
-          towerSlot.height
-        );
-      }
-
-      for (const baseSlot of lane.placeholders?.baseSlots ?? []) {
-        const basePos = this.camera.worldToScreen(baseSlot.x - baseSlot.width / 2, baseSlot.y - baseSlot.height / 2);
-        this.ctx.fillStyle = baseSlot.team === 'blue'
-          ? mapColors.alliedBaseSlot
-          : mapColors.enemyBaseSlot;
-        this.ctx.fillRect(
-          Math.round(basePos.x),
-          Math.round(basePos.y),
-          baseSlot.width,
-          baseSlot.height
-        );
-      }
-    }
   }
+
+  // ── range circles ────────────────────────────────────────────────────────────
+
+  // Returns the fill colour for an entity's range circle.
+  getRangeCircleColor(entity) {
+    if (entity.type === 'hero') {
+      return this.config.rangeCircle.heroColor;
+    }
+    // Structures: green while targeting a minion, red otherwise (idle / on hero).
+    return entity.target?.type === 'minion'
+      ? this.config.rangeCircle.greenColor
+      : this.config.rangeCircle.redColor;
+  }
+
+  drawRangeCircle(entity) {
+    if (typeof entity.attackRange !== 'number') { return; }
+    const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
+    const rc = this.config.rangeCircle;
+    const color = this.getRangeCircleColor(entity);
+
+    this.ctx.beginPath();
+    this.ctx.arc(Math.round(x), Math.round(y), entity.attackRange, 0, Math.PI * 2);
+    this.ctx.fillStyle = color;
+    this.ctx.globalAlpha = rc.alpha;
+    this.ctx.fill();
+    this.ctx.globalAlpha = 0.6;
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = rc.lineWidth;
+    this.ctx.stroke();
+    this.ctx.globalAlpha = 1;
+  }
+
+  // ── entities ─────────────────────────────────────────────────────────────────
 
   resolveSpriteId(entity) {
     return entity.spriteId ?? entity.renderType ?? entity.type;
@@ -105,24 +155,37 @@ export class Renderer {
     return Boolean(this.spriteRegistry?.[spriteId]?.image);
   }
 
+  // drawSprite supports both whole-image and sprite-sheet-crop entries.
+  // Entry format: { image, sx?, sy?, sw?, sh? }
   drawSprite(entity) {
     const spriteId = this.resolveSpriteId(entity);
-    const sprite = this.spriteRegistry?.[spriteId]?.image;
-    if (!sprite) {
-      return;
-    }
+    const entry = this.spriteRegistry?.[spriteId];
+    if (!entry?.image) { return; }
 
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
-    this.ctx.drawImage(
-      sprite,
-      Math.round(x - entity.width / 2),
-      Math.round(y - entity.height / 2),
-      entity.width,
-      entity.height
-    );
+    const dx = Math.round(x - entity.width / 2);
+    const dy = Math.round(y - entity.height / 2);
+
+    if (entry.sx !== undefined) {
+      this.ctx.drawImage(entry.image, entry.sx, entry.sy, entry.sw, entry.sh, dx, dy, entity.width, entity.height);
+    } else {
+      this.ctx.drawImage(entry.image, dx, dy, entity.width, entity.height);
+    }
   }
 
   drawEntity(entity) {
+    if (typeof entity.alive === 'boolean' && !entity.alive) {
+      return;
+    }
+
+    // Range circles are drawn behind the entity sprite.
+    const isAliveStructure = (entity.type === 'tower' || entity.type === 'base')
+      && entity.alive && entity.health > 0;
+
+    if (isAliveStructure || entity.showRangeCircle) {
+      this.drawRangeCircle(entity);
+    }
+
     if (this.canRenderSprite(entity)) {
       this.drawSprite(entity);
       return;

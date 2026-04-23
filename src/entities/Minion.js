@@ -8,6 +8,7 @@ export class Minion {
 
     this.type = 'minion';
     this.renderType = minionConfig.renderType;
+    this.spriteId = `minion-${team}`;
     this.x = x;
     this.y = y;
     this.width = minionConfig.width;

@@ -2,12 +2,14 @@
 import { CONFIG } from '../config.js';
 import { clamp } from '../utils.js';
 
+// Only hero and alive minions participate in dynamic (pushing) collision.
+// Towers and bases are static structures and are handled separately.
 function isActiveEntity(entity) {
   if (!entity || typeof entity.x !== 'number' || typeof entity.y !== 'number') {
     return false;
   }
 
-  if (entity.type === 'tower') {
+  if (entity.type === 'tower' || entity.type === 'base') {
     return false;
   }
 
@@ -88,19 +90,6 @@ function resolveStaticOverlap(entity, obstacle) {
   entity.y += dy >= 0 ? correction : -correction;
 }
 
-function getPlaceholderColliders(map) {
-  const colliders = [];
-  for (const lane of map.lanes ?? []) {
-    for (const towerSlot of lane.placeholders?.towerSlots ?? []) {
-      colliders.push(towerSlot);
-    }
-    for (const baseSlot of lane.placeholders?.baseSlots ?? []) {
-      colliders.push(baseSlot);
-    }
-  }
-  return colliders;
-}
-
 function clampToWorld(entity, map) {
   const minX = map.x + entity.width / 2;
   const maxX = map.x + map.width - entity.width / 2;
@@ -119,17 +108,25 @@ export function collisionSystem(entities, map) {
     }
   }
 
-  const placeholderColliders = getPlaceholderColliders(map);
+  // Resolve the hero against all alive towers and bases.  Using actual entity
+  // positions means a destroyed structure no longer blocks movement.
+  const staticStructures = entities.filter(
+    (e) => (e.type === 'tower' || e.type === 'base') && e.alive && e.health > 0
+  );
   for (const entity of activeEntities) {
     if (entity.type !== 'hero') {
       continue;
     }
-    for (const collider of placeholderColliders) {
-      resolveStaticOverlap(entity, collider);
+    for (const structure of staticStructures) {
+      resolveStaticOverlap(entity, structure);
     }
   }
 
+  // Clamp movable entities to world bounds (towers and bases never move).
   for (const entity of entities) {
+    if (entity.type === 'tower' || entity.type === 'base') {
+      continue;
+    }
     clampToWorld(entity, map);
   }
 }
