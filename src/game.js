@@ -24,6 +24,7 @@ export class Game {
     this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
     this.lastFrameAt = 0;
     this.fps = 0;
+    this.wasAttackPressed = false;
     this.gameOver = false;
     this.resultMessage = '';
 
@@ -79,6 +80,7 @@ export class Game {
     this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
     this.setupWorld();
     this.input.keys.clear();
+    this.wasAttackPressed = false;
     this.camera.follow(this.hero);
   }
 
@@ -135,6 +137,11 @@ export class Game {
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
     this.updateHeroVelocity();
+    const attackPressed = this.input.isAttackPressed();
+    if (attackPressed && !this.wasAttackPressed) {
+      this.hero.isAttackRequested = true;
+    }
+    this.wasAttackPressed = attackPressed;
     this.spawnSystem(this, dtMs);
     combatSystem(this.entities, nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
@@ -168,12 +175,22 @@ export class Game {
     }
 
     this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);
-    this.renderer.drawText('Restart: R (after match ends)', 12, 40);
-    this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 56);
+    this.renderer.drawText('Attack: Space', 12, 40);
+    this.renderer.drawText('Restart: R (after match ends)', 12, 56);
+    this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 72);
     this.renderer.drawText(
       `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
       12,
-      72,
+      88,
+      { font: '10px monospace', color: '#b9c5d6' }
+    );
+    const attackCooldown = this.hero.attackCooldown ?? 0;
+    const elapsedSinceLastAttack = this.lastFrameAt - (this.hero.lastAttackTime ?? 0);
+    const attackCooldownRemaining = Math.max(0, attackCooldown - elapsedSinceLastAttack);
+    this.renderer.drawText(
+      `Hero Attack CD: ${(attackCooldownRemaining / 1000).toFixed(2)}s`,
+      12,
+      104,
       { font: '10px monospace', color: '#b9c5d6' }
     );
 

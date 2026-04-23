@@ -13,8 +13,12 @@ function isLivingBase(entity) {
   return entity?.type === 'base' && entity.alive && entity.health > 0;
 }
 
+function isLivingHero(entity) {
+  return entity?.type === 'hero' && entity.health > 0;
+}
+
 function isCombatAttacker(entity) {
-  return isLivingMinion(entity) || isLivingTower(entity);
+  return isLivingMinion(entity) || isLivingTower(entity) || isLivingHero(entity);
 }
 
 function isValidTarget(attacker, target) {
@@ -29,10 +33,30 @@ function getAttackCooldown(attacker) {
   return attacker.attackCooldown ?? attacker.attackCooldownMs ?? 0;
 }
 
+function getLastAttackTime(attacker) {
+  return attacker.lastAttackTime ?? attacker.lastAttackAt ?? 0;
+}
+
+function setLastAttackTime(attacker, nowMs) {
+  if ('lastAttackTime' in attacker) {
+    attacker.lastAttackTime = nowMs;
+    return;
+  }
+  attacker.lastAttackAt = nowMs;
+}
+
 export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
     if (!isCombatAttacker(attacker)) {
       continue;
+    }
+
+    if (attacker.type === 'hero') {
+      const heroAttackRequested = attacker.isAttackRequested;
+      attacker.isAttackRequested = false;
+      if (!heroAttackRequested) {
+        continue;
+      }
     }
 
     const attackRangeSq = attacker.attackRange * attacker.attackRange;
@@ -66,7 +90,7 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (nowMs - attacker.lastAttackAt < getAttackCooldown(attacker)) {
+    if (nowMs - getLastAttackTime(attacker) < getAttackCooldown(attacker)) {
       continue;
     }
 
@@ -74,6 +98,6 @@ export function combatSystem(entities, nowMs) {
     if (attacker.target.health <= 0 && typeof attacker.target.alive === 'boolean') {
       attacker.target.alive = false;
     }
-    attacker.lastAttackAt = nowMs;
+    setLastAttackTime(attacker, nowMs);
   }
 }

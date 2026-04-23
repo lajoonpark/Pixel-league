@@ -13,8 +13,10 @@ export class Hero {
     this.color = '#4aa8ff';
     this.health = 120;
     this.maxHealth = 120;
-    this.damage = 18;
-    this.attackCooldownMs = 700;
-    this.lastAttackAt = 0;
+    this.attackDamage = 18;
+    this.attackRange = 60;
+    this.attackCooldown = 700;
+    this.lastAttackTime = 0;
+    this.isAttackRequested = false;
   }
 }
