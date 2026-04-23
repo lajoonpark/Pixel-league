@@ -1,6 +1,8 @@
 // Lane and world layout data for a one-lane MOBA map.
-const BASE_INSET_RATIO = 0.45;
-const OUTER_TOWER_INSET_RATIO = 2.1;
+const TOWER_OUTER_INSET_RATIO = 2.1;
+const BASE_WIDTH = 88;
+const BASE_HEIGHT = 64;
+const BASE_EDGE_PADDING = 14;
 
 export function createMainLane(world) {
   const centerY = world.height / 2;
@@ -9,7 +11,6 @@ export function createMainLane(world) {
   const end = { x: world.width, y: centerY };
   const centerLine = [start, end];
 
-  const baseInset = world.laneInset * BASE_INSET_RATIO;
   const towerInset = world.laneInset;
 
   return {
@@ -32,25 +33,25 @@ export function createMainLane(world) {
         {
           id: 'allied-base',
           team: 'blue',
-          x: baseInset,
+          x: BASE_EDGE_PADDING + BASE_WIDTH / 2,
           y: centerY,
-          width: 58,
-          height: 58,
+          width: BASE_WIDTH,
+          height: BASE_HEIGHT,
         },
         {
           id: 'enemy-base',
           team: 'red',
-          x: world.width - baseInset,
+          x: world.width - (BASE_EDGE_PADDING + BASE_WIDTH / 2),
           y: centerY,
-          width: 58,
-          height: 58,
+          width: BASE_WIDTH,
+          height: BASE_HEIGHT,
         },
       ],
       towerSlots: [
         {
           id: 'allied-outer-tower',
           team: 'blue',
-          x: towerInset * OUTER_TOWER_INSET_RATIO,
+          x: towerInset * TOWER_OUTER_INSET_RATIO,
           y: centerY,
           width: 40,
           height: 40,
@@ -58,7 +59,7 @@ export function createMainLane(world) {
         {
           id: 'enemy-outer-tower',
           team: 'red',
-          x: world.width - towerInset * OUTER_TOWER_INSET_RATIO,
+          x: world.width - towerInset * TOWER_OUTER_INSET_RATIO,
           y: centerY,
           width: 40,
           height: 40,

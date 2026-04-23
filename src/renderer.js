@@ -99,7 +99,7 @@ export class Renderer {
 
   drawHealthBar(entity) {
     if (
-      (entity.type !== 'minion' && entity.type !== 'tower')
+      (entity.type !== 'minion' && entity.type !== 'tower' && entity.type !== 'base')
       || (typeof entity.alive === 'boolean' && !entity.alive)
       || entity.health <= 0
       || typeof entity.health !== 'number'
@@ -108,7 +108,9 @@ export class Renderer {
       return;
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
-    const barWidth = entity.type === 'tower' ? Math.max(entity.width, 44) : entity.width;
+    const barWidth = entity.type === 'tower'
+      ? Math.max(entity.width, 44)
+      : (entity.type === 'base' ? Math.max(entity.width, 92) : entity.width);
     const barHeight = 4;
     const ratio = Math.max(0, entity.health) / entity.maxHealth;
     const barTop = Math.round(y - entity.height / 2 - 10);
@@ -118,7 +120,9 @@ export class Renderer {
     this.ctx.fillRect(barLeft, barTop, barWidth, barHeight);
     this.ctx.fillStyle = entity.type === 'tower'
       ? (entity.team === 'blue' ? '#72d4ff' : '#ff9d9d')
-      : '#55d66a';
+      : (entity.type === 'base'
+        ? (entity.team === 'blue' ? '#8ac2ff' : '#ffaaaa')
+        : '#55d66a');
     this.ctx.fillRect(
       barLeft,
       barTop,
@@ -131,5 +135,24 @@ export class Renderer {
     this.ctx.fillStyle = options.color ?? '#d0d7e2';
     this.ctx.font = options.font ?? '14px monospace';
     this.ctx.fillText(text, x, y);
+  }
+
+  drawCenteredOverlay(title, subtitle) {
+    this.ctx.fillStyle = 'rgba(12, 16, 26, 0.76)';
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+
+    this.ctx.fillStyle = '#f0f5ff';
+    this.ctx.font = 'bold 42px monospace';
+    this.ctx.fillText(title, this.canvas.width / 2, this.canvas.height / 2 - 16);
+
+    this.ctx.fillStyle = '#c9d5e6';
+    this.ctx.font = '18px monospace';
+    this.ctx.fillText(subtitle, this.canvas.width / 2, this.canvas.height / 2 + 26);
+
+    this.ctx.textAlign = 'start';
+    this.ctx.textBaseline = 'alphabetic';
   }
 }
