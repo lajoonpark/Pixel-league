@@ -5,9 +5,7 @@ export function healthSystem(entities) {
     if (typeof entity.health === 'number' && entity.health <= 0) {
       if (entity.type === 'base') {
         entity.health = 0;
-        if (typeof entity.alive === 'boolean') {
-          entity.alive = false;
-        }
+        entity.alive = false;
         continue;
       }
       entities.splice(i, 1);

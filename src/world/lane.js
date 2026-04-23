@@ -1,5 +1,5 @@
 // Lane and world layout data for a one-lane MOBA map.
-const OUTER_TOWER_INSET_RATIO = 2.1;
+const TOWER_OUTER_INSET_RATIO = 2.1;
 const BASE_WIDTH = 88;
 const BASE_HEIGHT = 64;
 const BASE_EDGE_PADDING = 14;
@@ -51,7 +51,7 @@ export function createMainLane(world) {
         {
           id: 'allied-outer-tower',
           team: 'blue',
-          x: towerInset * OUTER_TOWER_INSET_RATIO,
+          x: towerInset * TOWER_OUTER_INSET_RATIO,
           y: centerY,
           width: 40,
           height: 40,
@@ -59,7 +59,7 @@ export function createMainLane(world) {
         {
           id: 'enemy-outer-tower',
           team: 'red',
-          x: world.width - towerInset * OUTER_TOWER_INSET_RATIO,
+          x: world.width - towerInset * TOWER_OUTER_INSET_RATIO,
           y: centerY,
           width: 40,
           height: 40,
