@@ -16,6 +16,10 @@ function isActiveEntity(entity) {
     return false;
   }
 
+  if (entity.type === 'tower') {
+    return false;
+  }
+
   if (entity.type !== 'minion') {
     return true;
   }

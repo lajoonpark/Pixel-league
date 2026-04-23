@@ -2,18 +2,19 @@
 export class Tower {
   constructor(x, y, team = 'blue') {
     this.type = 'tower';
-    this.team = team;
     this.x = x;
     this.y = y;
-    this.vx = 0;
-    this.vy = 0;
-    this.width = 26;
-    this.height = 26;
-    this.color = team === 'blue' ? '#2f7fff' : '#d84545';
-    this.health = 300;
-    this.maxHealth = 300;
-    this.damage = 16;
-    this.attackCooldownMs = 1200;
+    this.width = 40;
+    this.height = 40;
+    this.team = team;
+    this.maxHealth = 420;
+    this.health = this.maxHealth;
+    this.attackRange = 180;
+    this.attackDamage = 14;
+    this.attackCooldown = 1100;
+    this.alive = true;
     this.lastAttackAt = 0;
+    this.target = null;
+    this.color = team === 'blue' ? '#6d9dff' : '#ff7a7a';
   }
 }

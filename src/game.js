@@ -4,6 +4,7 @@ import { Input } from './input.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
 import { Hero } from './entities/Hero.js';
+import { Tower } from './entities/Tower.js';
 import { createMap } from './world/map.js';
 import { createSpawnSystem } from './systems/spawnSystem.js';
 import { movementSystem } from './systems/movementSystem.js';
@@ -27,12 +28,22 @@ export class Game {
   }
 
   setupWorld() {
-    // First playable scene: one hero starts near the left side of the map.
+    // First playable scene: one hero and one tower per side on the lane.
     const lane = this.map.lanes[0];
     const spawnX = lane.start.x + CONFIG.gameplay.heroSpawnLaneOffsetX;
     const spawnY = lane.start.y;
     this.hero = new Hero(spawnX, spawnY, 'blue');
     this.entities.push(this.hero);
+
+    const alliedTowerSlot = lane.placeholders?.towerSlots?.find((slot) => slot.team === 'blue');
+    const enemyTowerSlot = lane.placeholders?.towerSlots?.find((slot) => slot.team === 'red');
+
+    if (alliedTowerSlot) {
+      this.entities.push(new Tower(alliedTowerSlot.x, alliedTowerSlot.y, alliedTowerSlot.team));
+    }
+    if (enemyTowerSlot) {
+      this.entities.push(new Tower(enemyTowerSlot.x, enemyTowerSlot.y, enemyTowerSlot.team));
+    }
   }
 
   start() {
