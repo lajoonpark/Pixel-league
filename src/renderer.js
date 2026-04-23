@@ -99,8 +99,8 @@ export class Renderer {
 
   drawHealthBar(entity) {
     if (
-      entity.type !== 'minion'
-      || !entity.alive
+      (entity.type !== 'minion' && entity.type !== 'tower')
+      || (typeof entity.alive === 'boolean' && !entity.alive)
       || entity.health <= 0
       || typeof entity.health !== 'number'
       || typeof entity.maxHealth !== 'number'
@@ -108,16 +108,20 @@ export class Renderer {
       return;
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
-    const barWidth = entity.width;
+    const barWidth = entity.type === 'tower' ? Math.max(entity.width, 44) : entity.width;
     const barHeight = 4;
     const ratio = Math.max(0, entity.health) / entity.maxHealth;
+    const barTop = Math.round(y - entity.height / 2 - 10);
+    const barLeft = Math.round(x - barWidth / 2);
 
-    this.ctx.fillStyle = '#280a0a';
-    this.ctx.fillRect(Math.round(x - barWidth / 2), Math.round(y - entity.height / 2 - 10), barWidth, barHeight);
-    this.ctx.fillStyle = '#55d66a';
+    this.ctx.fillStyle = '#1b1f2a';
+    this.ctx.fillRect(barLeft, barTop, barWidth, barHeight);
+    this.ctx.fillStyle = entity.type === 'tower'
+      ? (entity.team === 'blue' ? '#72d4ff' : '#ff9d9d')
+      : '#55d66a';
     this.ctx.fillRect(
-      Math.round(x - barWidth / 2),
-      Math.round(y - entity.height / 2 - 10),
+      barLeft,
+      barTop,
       Math.round(barWidth * ratio),
       barHeight
     );

@@ -5,13 +5,25 @@ function isLivingMinion(entity) {
   return entity?.type === 'minion' && entity.alive && entity.health > 0;
 }
 
+function isLivingTower(entity) {
+  return entity?.type === 'tower' && entity.alive && entity.health > 0;
+}
+
+function isCombatAttacker(entity) {
+  return isLivingMinion(entity) || isLivingTower(entity);
+}
+
 function isValidTarget(attacker, target) {
   return isLivingMinion(target) && target.team !== attacker.team;
 }
 
+function getAttackCooldown(attacker) {
+  return attacker.attackCooldown ?? attacker.attackCooldownMs ?? 0;
+}
+
 export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
-    if (!isLivingMinion(attacker)) {
+    if (!isCombatAttacker(attacker)) {
       continue;
     }
 
@@ -46,11 +58,14 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (nowMs - attacker.lastAttackAt < attacker.attackCooldownMs) {
+    if (nowMs - attacker.lastAttackAt < getAttackCooldown(attacker)) {
       continue;
     }
 
     attacker.target.health = Math.max(0, attacker.target.health - attacker.attackDamage);
+    if (attacker.target.health <= 0 && typeof attacker.target.alive === 'boolean') {
+      attacker.target.alive = false;
+    }
     attacker.lastAttackAt = nowMs;
   }
 }
