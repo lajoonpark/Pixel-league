@@ -182,7 +182,6 @@ export class Game {
 
   updateHeroRespawn(nowMs) {
     if (this.hero.alive) {
-      this.hero.respawnAtMs = 0;
       return;
     }
 
