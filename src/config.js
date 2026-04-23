@@ -80,7 +80,7 @@ export const CONFIG = {
     height: 40,
     health: 420,
     attackRange: 180,
-    attackDamage: 14,
+    attackDamage: 80,
     attackCooldownMs: 1100,
     colors: {
       blue: '#6d9dff',
@@ -94,7 +94,7 @@ export const CONFIG = {
     health: 600,
     // Combat stats – base attacks like a tower.
     attackRange: 200,
-    attackDamage: 14,
+    attackDamage: 150,
     attackCooldownMs: 1100,
     // Radius within which the allied hero is instantly healed to full.
     healRadius: 120,
