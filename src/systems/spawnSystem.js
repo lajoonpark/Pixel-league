@@ -5,7 +5,8 @@ export function createSpawnSystem(waveConfig) {
   const {
     spawnIntervalMs,
     spawnForwardOffset,
-    spawnLateralOffsets,
+    spawnCount,
+    spawnLineSpacingX,
   } = waveConfig;
 
   let elapsedMs = 0;
@@ -28,17 +29,20 @@ export function createSpawnSystem(waveConfig) {
       const start = lane.points[0];
       const end = lane.points[lane.points.length - 1];
 
-      for (const lateralOffset of spawnLateralOffsets) {
+      // Spawn spawnCount minions per team in a single-file line along the lane
+      // axis.  Index 0 is the rearmost unit; the front of the line reaches the
+      // fight first because it has the highest x (blue) / lowest x (red).
+      for (let i = 0; i < spawnCount; i += 1) {
         game.entities.push(new Minion(
-          start.x + spawnForwardOffset,
-          start.y + lateralOffset,
+          start.x + spawnForwardOffset + i * spawnLineSpacingX,
+          start.y,
           'blue',
           lane.id,
           0
         ));
         game.entities.push(new Minion(
-          end.x - spawnForwardOffset,
-          end.y + lateralOffset,
+          end.x - spawnForwardOffset - i * spawnLineSpacingX,
+          end.y,
           'red',
           lane.id,
           0

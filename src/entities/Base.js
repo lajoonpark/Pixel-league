@@ -7,16 +7,23 @@ export class Base {
 
     this.type = 'base';
     this.renderType = baseConfig.renderType;
+    // Team-specific sprite so the renderer picks the right art.
+    this.spriteId = `base-${team}`;
     this.team = team;
     this.x = x;
     this.y = y;
-    this.vx = 0;
-    this.vy = 0;
+    // Bases are static structures; they do not move.
     this.width = width ?? baseConfig.width;
     this.height = height ?? baseConfig.height;
     this.color = team === 'blue' ? baseConfig.colors.blue : baseConfig.colors.red;
     this.health = baseConfig.health;
     this.maxHealth = baseConfig.health;
     this.alive = true;
+    // Combat – bases attack like towers.
+    this.attackRange = baseConfig.attackRange;
+    this.attackDamage = baseConfig.attackDamage;
+    this.attackCooldownMs = baseConfig.attackCooldownMs;
+    this.lastAttackMs = 0;
+    this.target = null;
   }
 }

@@ -22,7 +22,25 @@ function getLaneForMinion(minion, map) {
   return lanes[0];
 }
 
-function updateMinionMovement(minion, map, dtSeconds) {
+// Returns the nearest alive enemy tower that a minion must not advance past,
+// or null if no such tower exists (all enemy towers destroyed).
+function getBlockingTower(minion, entities) {
+  const enemyTeam = minion.team === 'blue' ? 'red' : 'blue';
+  const towers = entities.filter(
+    (e) => e.type === 'tower' && e.team === enemyTeam && e.alive && e.health > 0
+  );
+  if (towers.length === 0) {
+    return null;
+  }
+  if (minion.team === 'blue') {
+    // Blue moves right (+x): blocked by the leftmost red tower.
+    return towers.reduce((min, t) => (t.x < min.x ? t : min));
+  }
+  // Red moves left (-x): blocked by the rightmost blue tower.
+  return towers.reduce((max, t) => (t.x > max.x ? t : max));
+}
+
+function updateMinionMovement(minion, map, dtSeconds, entities) {
   if (!minion.alive || minion.health <= 0) {
     minion.vx = 0;
     minion.vy = 0;
@@ -62,14 +80,25 @@ function updateMinionMovement(minion, map, dtSeconds) {
     -laneCorrectionSpeed,
     laneCorrectionSpeed
   );
-  minion.x += minion.vx * dtSeconds;
+
+  // Tower-gating: a minion may not advance past the nearest alive enemy tower.
+  // Once that tower is destroyed, the minion can reach the next objective.
+  const blocking = getBlockingTower(minion, entities);
+  const newX = minion.x + minion.vx * dtSeconds;
+  if (blocking) {
+    // The limit is the near face of the tower minus a tiny gap.
+    const limit = blocking.x - moveDirection * (blocking.width / 2 + minion.width / 2 + 1);
+    minion.x = moveDirection > 0 ? Math.min(newX, limit) : Math.max(newX, limit);
+  } else {
+    minion.x = newX;
+  }
   minion.y += minion.vy * dtSeconds;
 }
 
 export function movementSystem(entities, map, dtSeconds) {
   for (const entity of entities) {
     if (entity.type === 'minion') {
-      updateMinionMovement(entity, map, dtSeconds);
+      updateMinionMovement(entity, map, dtSeconds, entities);
       continue;
     }
 

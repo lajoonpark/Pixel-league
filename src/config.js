@@ -31,12 +31,17 @@ export const CONFIG = {
   },
   structures: {
     towerOuterInsetRatio: 2.1,
+    // Inner towers sit at this fraction of map width from each edge (0.375 = 37.5 %).
+    towerInnerXRatio: 0.375,
     baseEdgePadding: 14,
   },
   waves: {
-    spawnIntervalMs: 3000,
+    spawnIntervalMs: 30000,
+    // Number of minions spawned per team per wave, arranged in a line.
+    spawnCount: 7,
+    // Gap between consecutive minions along the lane axis.
+    spawnLineSpacingX: 18,
     spawnForwardOffset: 24,
-    spawnLateralOffsets: [-20, 20],
   },
   hero: {
     renderType: 'hero',
@@ -87,6 +92,12 @@ export const CONFIG = {
     width: 88,
     height: 64,
     health: 600,
+    // Combat stats – base attacks like a tower.
+    attackRange: 200,
+    attackDamage: 14,
+    attackCooldownMs: 1100,
+    // Radius within which the allied hero is instantly healed to full.
+    healRadius: 120,
     colors: {
       blue: '#2053bf',
       red: '#a92c2c',
@@ -98,6 +109,17 @@ export const CONFIG = {
     maxStaticSeparationPerStep: 6,
     heroWeight: 0.85,
     minionWeight: 0.5,
+  },
+  // Visual style for attack-range circles drawn on entities.
+  rangeCircle: {
+    heroColor: '#4aa8ff',
+    heroAlpha: 0.22,
+    // Green when a structure is targeting a minion.
+    greenColor: '#44ff88',
+    // Red when a structure is idle or targeting the hero.
+    redColor: '#ff4444',
+    alpha: 0.15,
+    lineWidth: 1.5,
   },
   rendering: {
     laneCenterLineHeight: 4,

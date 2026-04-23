@@ -7,6 +7,7 @@ export class Hero {
 
     this.type = 'hero';
     this.renderType = heroConfig.renderType;
+    this.spriteId = 'hero';
     this.team = team;
     this.x = x;
     this.y = y;
@@ -24,6 +25,8 @@ export class Hero {
     this.attackCooldownMs = heroConfig.attackCooldownMs;
     this.lastAttackMs = 0;
     this.isAttackRequested = false;
+    // True while Space is held; drives the range-circle overlay.
+    this.showRangeCircle = false;
     this.respawnAtMs = 0;
   }
 }

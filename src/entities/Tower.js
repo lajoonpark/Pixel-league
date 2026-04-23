@@ -7,6 +7,7 @@ export class Tower {
 
     this.type = 'tower';
     this.renderType = towerConfig.renderType;
+    this.spriteId = `tower-${team}`;
     this.x = x;
     this.y = y;
     this.width = towerConfig.width;
