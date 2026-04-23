@@ -1,20 +1,25 @@
 // Tower entity that acts as a defensive lane objective.
+import { CONFIG } from '../config.js';
+
 export class Tower {
   constructor(x, y, team = 'blue') {
+    const towerConfig = CONFIG.tower;
+
     this.type = 'tower';
+    this.renderType = towerConfig.renderType;
     this.x = x;
     this.y = y;
-    this.width = 40;
-    this.height = 40;
+    this.width = towerConfig.width;
+    this.height = towerConfig.height;
     this.team = team;
-    this.maxHealth = 420;
+    this.maxHealth = towerConfig.health;
     this.health = this.maxHealth;
-    this.attackRange = 180;
-    this.attackDamage = 100;
-    this.attackCooldown = 1100;
+    this.attackRange = towerConfig.attackRange;
+    this.attackDamage = towerConfig.attackDamage;
+    this.attackCooldownMs = towerConfig.attackCooldownMs;
     this.alive = true;
-    this.lastAttackAt = 0;
+    this.lastAttackMs = 0;
     this.target = null;
-    this.color = team === 'blue' ? '#6d9dff' : '#ff7a7a';
+    this.color = team === 'blue' ? towerConfig.colors.blue : towerConfig.colors.red;
   }
 }
