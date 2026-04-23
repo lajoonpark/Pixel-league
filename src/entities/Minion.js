@@ -14,7 +14,7 @@ export class Minion {
     this.moveSpeed = 90;
     this.attackDamage = 8;
     this.attackRange = 28;
-    this.attackCooldownMs = 1000;
+    this.attackCooldownMs = 1300;
     this.lastAttackAt = 0;
     this.target = null;
     this.alive = true;
