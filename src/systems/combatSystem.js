@@ -33,6 +33,18 @@ function getAttackCooldown(attacker) {
   return attacker.attackCooldown ?? attacker.attackCooldownMs ?? 0;
 }
 
+function getLastAttackTime(attacker) {
+  return attacker.lastAttackTime ?? attacker.lastAttackAt ?? 0;
+}
+
+function setLastAttackTime(attacker, nowMs) {
+  if ('lastAttackTime' in attacker) {
+    attacker.lastAttackTime = nowMs;
+    return;
+  }
+  attacker.lastAttackAt = nowMs;
+}
+
 export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
     if (!isCombatAttacker(attacker)) {
@@ -74,7 +86,7 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (nowMs - attacker.lastAttackAt < getAttackCooldown(attacker)) {
+    if (nowMs - getLastAttackTime(attacker) < getAttackCooldown(attacker)) {
       if (attacker.type === 'hero') {
         attacker.isAttackRequested = false;
       }
@@ -85,8 +97,7 @@ export function combatSystem(entities, nowMs) {
     if (attacker.target.health <= 0 && typeof attacker.target.alive === 'boolean') {
       attacker.target.alive = false;
     }
-    attacker.lastAttackAt = nowMs;
-    attacker.lastAttackTime = nowMs;
+    setLastAttackTime(attacker, nowMs);
     if (attacker.type === 'hero') {
       attacker.isAttackRequested = false;
     }

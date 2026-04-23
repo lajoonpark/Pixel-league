@@ -17,7 +17,6 @@ export class Hero {
     this.attackRange = 60;
     this.attackCooldown = 700;
     this.lastAttackTime = 0;
-    this.lastAttackAt = 0;
     this.isAttackRequested = false;
   }
 }
