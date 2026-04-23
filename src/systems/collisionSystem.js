@@ -1,15 +1,6 @@
 // Collision system enforces simple world boundary constraints.
+import { CONFIG } from '../config.js';
 import { clamp } from '../utils.js';
-
-// Minimum overlap in pixels before applying separation.
-const MIN_OVERLAP_TO_RESOLVE = 1.5;
-// Maximum dynamic unit separation applied per frame, in pixels.
-const MAX_DYNAMIC_SEPARATION_PER_STEP = 4;
-// Maximum placeholder-vs-hero correction applied per frame, in pixels.
-const MAX_STATIC_SEPARATION_PER_STEP = 6;
-// Relative separation weights (higher = receives more correction movement).
-const HERO_COLLISION_WEIGHT = 0.85;
-const MINION_COLLISION_WEIGHT = 0.5;
 
 function isActiveEntity(entity) {
   if (!entity || typeof entity.x !== 'number' || typeof entity.y !== 'number') {
@@ -30,7 +21,9 @@ function isActiveEntity(entity) {
 function getWeight(entity) {
   // Keep hero collision simple and avoid unrealistic hero shove behavior.
   // The hero yields more than minions during overlap correction.
-  return entity.type === 'hero' ? HERO_COLLISION_WEIGHT : MINION_COLLISION_WEIGHT;
+  return entity.type === 'hero'
+    ? CONFIG.collision.heroWeight
+    : CONFIG.collision.minionWeight;
 }
 
 function resolveDynamicOverlap(a, b) {
@@ -39,7 +32,7 @@ function resolveDynamicOverlap(a, b) {
   const overlapX = (a.width + b.width) / 2 - Math.abs(dx);
   const overlapY = (a.height + b.height) / 2 - Math.abs(dy);
 
-  if (overlapX <= MIN_OVERLAP_TO_RESOLVE || overlapY <= MIN_OVERLAP_TO_RESOLVE) {
+  if (overlapX <= CONFIG.collision.minOverlapToResolve || overlapY <= CONFIG.collision.minOverlapToResolve) {
     return;
   }
 
@@ -51,14 +44,20 @@ function resolveDynamicOverlap(a, b) {
 
   if (overlapX < overlapY) {
     const direction = dx >= 0 ? 1 : -1;
-    const correction = Math.min(overlapX - MIN_OVERLAP_TO_RESOLVE, MAX_DYNAMIC_SEPARATION_PER_STEP);
+    const correction = Math.min(
+      overlapX - CONFIG.collision.minOverlapToResolve,
+      CONFIG.collision.maxDynamicSeparationPerStep
+    );
     a.x -= direction * correction * ratioA;
     b.x += direction * correction * ratioB;
     return;
   }
 
   const direction = dy >= 0 ? 1 : -1;
-  const correction = Math.min(overlapY - MIN_OVERLAP_TO_RESOLVE, MAX_DYNAMIC_SEPARATION_PER_STEP);
+  const correction = Math.min(
+    overlapY - CONFIG.collision.minOverlapToResolve,
+    CONFIG.collision.maxDynamicSeparationPerStep
+  );
   a.y -= direction * correction * ratioA;
   b.y += direction * correction * ratioB;
 }
@@ -69,17 +68,23 @@ function resolveStaticOverlap(entity, obstacle) {
   const overlapX = (entity.width + obstacle.width) / 2 - Math.abs(dx);
   const overlapY = (entity.height + obstacle.height) / 2 - Math.abs(dy);
 
-  if (overlapX <= MIN_OVERLAP_TO_RESOLVE || overlapY <= MIN_OVERLAP_TO_RESOLVE) {
+  if (overlapX <= CONFIG.collision.minOverlapToResolve || overlapY <= CONFIG.collision.minOverlapToResolve) {
     return;
   }
 
   if (overlapX < overlapY) {
-    const correction = Math.min(overlapX - MIN_OVERLAP_TO_RESOLVE, MAX_STATIC_SEPARATION_PER_STEP);
+    const correction = Math.min(
+      overlapX - CONFIG.collision.minOverlapToResolve,
+      CONFIG.collision.maxStaticSeparationPerStep
+    );
     entity.x += dx >= 0 ? correction : -correction;
     return;
   }
 
-  const correction = Math.min(overlapY - MIN_OVERLAP_TO_RESOLVE, MAX_STATIC_SEPARATION_PER_STEP);
+  const correction = Math.min(
+    overlapY - CONFIG.collision.minOverlapToResolve,
+    CONFIG.collision.maxStaticSeparationPerStep
+  );
   entity.y += dy >= 0 ? correction : -correction;
 }
 

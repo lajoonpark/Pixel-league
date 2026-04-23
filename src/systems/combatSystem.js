@@ -35,19 +35,15 @@ function isValidTarget(attacker, target) {
 }
 
 function getAttackCooldown(attacker) {
-  return attacker.attackCooldown ?? attacker.attackCooldownMs ?? 0;
+  return attacker.attackCooldownMs ?? attacker.attackCooldown ?? 0;
 }
 
 function getLastAttackTime(attacker) {
-  return attacker.lastAttackTime ?? attacker.lastAttackAt ?? 0;
+  return attacker.lastAttackMs ?? attacker.lastAttackTime ?? attacker.lastAttackAt ?? 0;
 }
 
 function setLastAttackTime(attacker, nowMs) {
-  if ('lastAttackTime' in attacker) {
-    attacker.lastAttackTime = nowMs;
-    return;
-  }
-  attacker.lastAttackAt = nowMs;
+  attacker.lastAttackMs = nowMs;
 }
 
 export function combatSystem(entities, nowMs) {

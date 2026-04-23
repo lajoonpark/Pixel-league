@@ -1,20 +1,16 @@
 // Lane and world layout data for a one-lane MOBA map.
-const TOWER_OUTER_INSET_RATIO = 2.1;
-const BASE_WIDTH = 88;
-const BASE_HEIGHT = 64;
-const BASE_EDGE_PADDING = 14;
-
-export function createMainLane(world) {
-  const centerY = world.height / 2;
-  const laneWidth = world.laneHeight;
+export function createMainLane(mapConfig, structuresConfig, baseConfig, towerConfig) {
+  const centerY = mapConfig.height / 2;
+  const laneWidth = mapConfig.laneWidth;
   const start = { x: 0, y: centerY };
-  const end = { x: world.width, y: centerY };
+  const end = { x: mapConfig.width, y: centerY };
   const centerLine = [start, end];
 
-  const towerInset = world.laneInset;
+  const towerInset = mapConfig.laneInset;
 
   return {
     id: 'mid',
+    renderType: 'lane',
     start,
     end,
     width: laneWidth,
@@ -32,66 +28,72 @@ export function createMainLane(world) {
       baseSlots: [
         {
           id: 'allied-base',
+          renderType: baseConfig.renderType,
           team: 'blue',
-          x: BASE_EDGE_PADDING + BASE_WIDTH / 2,
+          x: structuresConfig.baseEdgePadding + baseConfig.width / 2,
           y: centerY,
-          width: BASE_WIDTH,
-          height: BASE_HEIGHT,
+          width: baseConfig.width,
+          height: baseConfig.height,
         },
         {
           id: 'enemy-base',
+          renderType: baseConfig.renderType,
           team: 'red',
-          x: world.width - (BASE_EDGE_PADDING + BASE_WIDTH / 2),
+          x: mapConfig.width - (structuresConfig.baseEdgePadding + baseConfig.width / 2),
           y: centerY,
-          width: BASE_WIDTH,
-          height: BASE_HEIGHT,
+          width: baseConfig.width,
+          height: baseConfig.height,
         },
       ],
       towerSlots: [
         {
           id: 'allied-outer-tower',
+          renderType: towerConfig.renderType,
           team: 'blue',
-          x: towerInset * TOWER_OUTER_INSET_RATIO,
+          x: towerInset * structuresConfig.towerOuterInsetRatio,
           y: centerY,
-          width: 40,
-          height: 40,
+          width: towerConfig.width,
+          height: towerConfig.height,
         },
         {
           id: 'enemy-outer-tower',
+          renderType: towerConfig.renderType,
           team: 'red',
-          x: world.width - towerInset * TOWER_OUTER_INSET_RATIO,
+          x: mapConfig.width - towerInset * structuresConfig.towerOuterInsetRatio,
           y: centerY,
-          width: 40,
-          height: 40,
+          width: towerConfig.width,
+          height: towerConfig.height,
         },
       ],
     },
   };
 }
 
-export function createWorldLayout(world) {
-  const alliedSideWidth = world.laneInset * 2;
-  const enemySideWidth = world.laneInset * 2;
-  const lane = createMainLane(world);
+export function createWorldLayout(mapConfig, structuresConfig, baseConfig, towerConfig) {
+  const alliedSideWidth = mapConfig.laneInset * mapConfig.sideWidthMultiplier;
+  const enemySideWidth = mapConfig.laneInset * mapConfig.sideWidthMultiplier;
+  const lane = createMainLane(mapConfig, structuresConfig, baseConfig, towerConfig);
 
   return {
     lanes: [lane],
     sides: [
       {
         id: 'allied-side',
+        renderType: 'map-side',
         team: 'blue',
         x: 0,
         y: 0,
         width: alliedSideWidth,
-        height: world.height,
+        height: mapConfig.height,
       },
       {
         id: 'enemy-side',
+        renderType: 'map-side',
         team: 'red',
-        x: world.width - enemySideWidth,
+        x: mapConfig.width - enemySideWidth,
         y: 0,
         width: enemySideWidth,
-        height: world.height,
+        height: mapConfig.height,
       },
     ],
   };

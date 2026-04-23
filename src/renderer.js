@@ -1,11 +1,11 @@
 // Renderer wraps low-level canvas drawing operations.
-const CENTER_LINE_HEIGHT = 4;
-
 export class Renderer {
-  constructor(canvas, camera) {
+  constructor(canvas, camera, config) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.camera = camera;
+    this.config = config;
+    this.spriteRegistry = config.rendering.sprites;
   }
 
   clear() {
@@ -14,6 +14,7 @@ export class Renderer {
 
   drawMap(map) {
     const topLeft = this.camera.worldToScreen(map.x, map.y);
+    const mapColors = this.config.map.colors;
 
     this.ctx.fillStyle = map.color;
     this.ctx.fillRect(
@@ -34,7 +35,9 @@ export class Renderer {
 
     for (const side of map.sides ?? []) {
       const sidePos = this.camera.worldToScreen(side.x, side.y);
-      this.ctx.fillStyle = side.team === 'blue' ? '#253a64' : '#5a2b2b';
+      this.ctx.fillStyle = side.team === 'blue'
+        ? mapColors.alliedSide
+        : mapColors.enemySide;
       this.ctx.fillRect(
         Math.round(sidePos.x),
         Math.round(sidePos.y),
@@ -45,7 +48,7 @@ export class Renderer {
 
     for (const lane of map.lanes) {
       const lanePos = this.camera.worldToScreen(lane.bounds.x, lane.bounds.y);
-      this.ctx.fillStyle = '#2d3446';
+      this.ctx.fillStyle = mapColors.lane;
       this.ctx.fillRect(
         Math.round(lanePos.x),
         Math.round(lanePos.y),
@@ -53,18 +56,23 @@ export class Renderer {
         lane.bounds.height
       );
 
-      this.ctx.fillStyle = '#7f89a5';
-      const centerStart = this.camera.worldToScreen(lane.start.x, lane.start.y - CENTER_LINE_HEIGHT / 2);
+      this.ctx.fillStyle = mapColors.laneCenterLine;
+      const centerStart = this.camera.worldToScreen(
+        lane.start.x,
+        lane.start.y - this.config.rendering.laneCenterLineHeight / 2
+      );
       this.ctx.fillRect(
         Math.round(centerStart.x),
         Math.round(centerStart.y),
         lane.end.x - lane.start.x,
-        CENTER_LINE_HEIGHT
+        this.config.rendering.laneCenterLineHeight
       );
 
       for (const towerSlot of lane.placeholders?.towerSlots ?? []) {
         const towerPos = this.camera.worldToScreen(towerSlot.x - towerSlot.width / 2, towerSlot.y - towerSlot.height / 2);
-        this.ctx.fillStyle = towerSlot.team === 'blue' ? '#5d82d1' : '#bf6464';
+        this.ctx.fillStyle = towerSlot.team === 'blue'
+          ? mapColors.alliedTowerSlot
+          : mapColors.enemyTowerSlot;
         this.ctx.fillRect(
           Math.round(towerPos.x),
           Math.round(towerPos.y),
@@ -75,7 +83,9 @@ export class Renderer {
 
       for (const baseSlot of lane.placeholders?.baseSlots ?? []) {
         const basePos = this.camera.worldToScreen(baseSlot.x - baseSlot.width / 2, baseSlot.y - baseSlot.height / 2);
-        this.ctx.fillStyle = baseSlot.team === 'blue' ? '#3f6dce' : '#b55252';
+        this.ctx.fillStyle = baseSlot.team === 'blue'
+          ? mapColors.alliedBaseSlot
+          : mapColors.enemyBaseSlot;
         this.ctx.fillRect(
           Math.round(basePos.x),
           Math.round(basePos.y),
@@ -84,6 +94,40 @@ export class Renderer {
         );
       }
     }
+  }
+
+  resolveSpriteId(entity) {
+    return entity.spriteId ?? entity.renderType ?? entity.type;
+  }
+
+  canRenderSprite(entity) {
+    const spriteId = this.resolveSpriteId(entity);
+    return Boolean(this.spriteRegistry?.[spriteId]?.image);
+  }
+
+  drawSprite(entity) {
+    const spriteId = this.resolveSpriteId(entity);
+    const sprite = this.spriteRegistry?.[spriteId]?.image;
+    if (!sprite) {
+      return;
+    }
+
+    const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
+    this.ctx.drawImage(
+      sprite,
+      Math.round(x - entity.width / 2),
+      Math.round(y - entity.height / 2),
+      entity.width,
+      entity.height
+    );
+  }
+
+  drawEntity(entity) {
+    if (this.canRenderSprite(entity)) {
+      this.drawSprite(entity);
+      return;
+    }
+    this.drawRect(entity);
   }
 
   drawRect(entity) {
@@ -98,6 +142,8 @@ export class Renderer {
   }
 
   drawHealthBar(entity) {
+    const healthBarConfig = this.config.rendering.healthBar;
+
     if (
       (entity.type !== 'hero' && entity.type !== 'minion' && entity.type !== 'tower' && entity.type !== 'base')
       || (typeof entity.alive === 'boolean' && !entity.alive)
@@ -109,20 +155,20 @@ export class Renderer {
     }
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
     const barWidth = entity.type === 'tower'
-      ? Math.max(entity.width, 44)
-      : (entity.type === 'base' ? Math.max(entity.width, 92) : entity.width);
-    const barHeight = 4;
+      ? Math.max(entity.width, healthBarConfig.towerMinWidth)
+      : (entity.type === 'base' ? Math.max(entity.width, healthBarConfig.baseMinWidth) : entity.width);
+    const barHeight = healthBarConfig.height;
     const ratio = Math.max(0, entity.health) / entity.maxHealth;
-    const barTop = Math.round(y - entity.height / 2 - 10);
+    const barTop = Math.round(y - entity.height / 2 - healthBarConfig.offsetY);
     const barLeft = Math.round(x - barWidth / 2);
 
-    this.ctx.fillStyle = '#1b1f2a';
+    this.ctx.fillStyle = healthBarConfig.backgroundColor;
     this.ctx.fillRect(barLeft, barTop, barWidth, barHeight);
     this.ctx.fillStyle = entity.type === 'tower'
-      ? (entity.team === 'blue' ? '#72d4ff' : '#ff9d9d')
+      ? (entity.team === 'blue' ? healthBarConfig.colors.alliedTower : healthBarConfig.colors.enemyTower)
       : (entity.type === 'base'
-        ? (entity.team === 'blue' ? '#8ac2ff' : '#ffaaaa')
-        : '#55d66a');
+        ? (entity.team === 'blue' ? healthBarConfig.colors.alliedBase : healthBarConfig.colors.enemyBase)
+        : healthBarConfig.colors[entity.type]);
     this.ctx.fillRect(
       barLeft,
       barTop,
@@ -132,24 +178,24 @@ export class Renderer {
   }
 
   drawText(text, x, y, options = {}) {
-    this.ctx.fillStyle = options.color ?? '#d0d7e2';
-    this.ctx.font = options.font ?? '14px monospace';
+    this.ctx.fillStyle = options.color ?? this.config.ui.color;
+    this.ctx.font = options.font ?? this.config.ui.font;
     this.ctx.fillText(text, x, y);
   }
 
   drawCenteredOverlay(title, subtitle) {
-    this.ctx.fillStyle = 'rgba(12, 16, 26, 0.76)';
+    this.ctx.fillStyle = this.config.ui.overlay.background;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
 
-    this.ctx.fillStyle = '#f0f5ff';
-    this.ctx.font = 'bold 42px monospace';
+    this.ctx.fillStyle = this.config.ui.overlay.titleColor;
+    this.ctx.font = this.config.ui.overlay.titleFont;
     this.ctx.fillText(title, this.canvas.width / 2, this.canvas.height / 2 - 16);
 
-    this.ctx.fillStyle = '#c9d5e6';
-    this.ctx.font = '18px monospace';
+    this.ctx.fillStyle = this.config.ui.overlay.subtitleColor;
+    this.ctx.font = this.config.ui.overlay.subtitleFont;
     this.ctx.fillText(subtitle, this.canvas.width / 2, this.canvas.height / 2 + 26);
 
     this.ctx.textAlign = 'start';

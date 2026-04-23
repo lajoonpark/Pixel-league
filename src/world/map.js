@@ -2,16 +2,17 @@
 import { createWorldLayout } from './lane.js';
 
 export function createMap(config) {
-  const worldLayout = createWorldLayout(config.world);
+  const worldLayout = createWorldLayout(config.map, config.structures, config.base, config.tower);
 
   return {
+    renderType: 'map',
     x: 0,
     y: 0,
-    width: config.world.width,
-    height: config.world.height,
-    color: '#1f2533',
-    borderColor: '#5b667e',
-    borderWidth: 4,
+    width: config.map.width,
+    height: config.map.height,
+    color: config.map.colors.background,
+    borderColor: config.map.colors.border,
+    borderWidth: config.map.borderWidth,
     lanes: worldLayout.lanes,
     sides: worldLayout.sides,
   };

@@ -1,7 +1,12 @@
 // Base entity representing each team's main objective.
+import { CONFIG } from '../config.js';
+
 export class Base {
-  constructor(x, y, team = 'blue', width = 88, height = 64) {
+  constructor(x, y, team = 'blue', width = CONFIG.base.width, height = CONFIG.base.height) {
+    const baseConfig = CONFIG.base;
+
     this.type = 'base';
+    this.renderType = baseConfig.renderType;
     this.team = team;
     this.x = x;
     this.y = y;
@@ -9,9 +14,9 @@ export class Base {
     this.vy = 0;
     this.width = width;
     this.height = height;
-    this.color = team === 'blue' ? '#2053bf' : '#a92c2c';
-    this.health = 600;
-    this.maxHealth = 600;
+    this.color = team === 'blue' ? baseConfig.colors.blue : baseConfig.colors.red;
+    this.health = baseConfig.health;
+    this.maxHealth = baseConfig.health;
     this.alive = true;
   }
 }

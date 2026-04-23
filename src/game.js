@@ -1,5 +1,5 @@
 // Game orchestrates state, systems, update loop, and rendering.
-import { CONFIG } from './config.js';
+import { CONFIG, GAME_STATES } from './config.js';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
@@ -19,13 +19,14 @@ export class Game {
     this.map = createMap(CONFIG);
     this.input = new Input();
     this.camera = new Camera(canvas.width, canvas.height, this.map.width, this.map.height);
-    this.renderer = new Renderer(canvas, this.camera);
+    this.renderer = new Renderer(canvas, this.camera, CONFIG);
     this.entities = [];
-    this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
+    this.spawnSystem = createSpawnSystem(CONFIG.waves);
     this.lastFrameAt = 0;
     this.fps = 0;
+    this.waveCount = 0;
     this.wasAttackPressed = false;
-    this.gameOver = false;
+    this.state = GAME_STATES.playing;
     this.resultMessage = '';
 
     this.setupWorld();
@@ -75,16 +76,20 @@ export class Game {
   getAlliedHeroSpawnPoint() {
     const lane = this.map.lanes[0];
     return {
-      x: lane.start.x + CONFIG.gameplay.heroSpawnLaneOffsetX,
+      x: lane.start.x + CONFIG.hero.spawnLaneOffsetX,
       y: lane.start.y,
     };
   }
 
   resetMatch() {
+    this.hero = null;
+    this.alliedBase = null;
+    this.enemyBase = null;
     this.entities = [];
-    this.gameOver = false;
+    this.state = GAME_STATES.playing;
     this.resultMessage = '';
-    this.spawnSystem = createSpawnSystem(CONFIG.gameplay.minionSpawnIntervalMs);
+    this.spawnSystem = createSpawnSystem(CONFIG.waves);
+    this.waveCount = 0;
     this.setupWorld();
     this.input.keys.clear();
     this.wasAttackPressed = false;
@@ -92,10 +97,10 @@ export class Game {
   }
 
   setGameOver(message) {
-    if (this.gameOver) {
+    if (this.state === GAME_STATES.gameOver) {
       return;
     }
-    this.gameOver = true;
+    this.state = GAME_STATES.gameOver;
     this.resultMessage = message;
     for (const entity of this.entities) {
       if (typeof entity.vx === 'number') {
@@ -103,6 +108,9 @@ export class Game {
       }
       if (typeof entity.vy === 'number') {
         entity.vy = 0;
+      }
+      if ('target' in entity) {
+        entity.target = null;
       }
     }
   }
@@ -134,7 +142,7 @@ export class Game {
   }
 
   update(dtMs, nowMs) {
-    if (this.gameOver) {
+    if (this.state === GAME_STATES.gameOver) {
       if (this.input.isPressed('KeyR')) {
         this.resetMatch();
       }
@@ -149,7 +157,8 @@ export class Game {
       this.hero.isAttackRequested = true;
     }
     this.wasAttackPressed = attackPressed;
-    this.spawnSystem(this, dtMs);
+    this.spawnSystem.update(this, dtMs);
+    this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
@@ -167,7 +176,7 @@ export class Game {
       return;
     }
 
-    const speed = this.hero.moveSpeed ?? CONFIG.gameplay.defaultHeroMoveSpeed;
+    const speed = this.hero.moveSpeed ?? CONFIG.hero.moveSpeed;
     const move = this.input.getMoveIntent();
     const magnitude = Math.hypot(move.x, move.y);
     if (magnitude === 0) {
@@ -186,7 +195,7 @@ export class Game {
     }
 
     if (!this.hero.respawnAtMs) {
-      this.hero.respawnAtMs = nowMs + CONFIG.gameplay.heroRespawnDelayMs;
+      this.hero.respawnAtMs = nowMs + CONFIG.hero.respawnDelayMs;
       return;
     }
 
@@ -211,7 +220,7 @@ export class Game {
     this.renderer.drawMap(this.map);
 
     for (const entity of this.entities) {
-      this.renderer.drawRect(entity);
+      this.renderer.drawEntity(entity);
       this.renderer.drawHealthBar(entity);
     }
 
@@ -223,16 +232,16 @@ export class Game {
       `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
       12,
       88,
-      { font: '10px monospace', color: '#b9c5d6' }
+      { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
     );
-    const attackCooldown = this.hero.attackCooldown ?? 0;
-    const elapsedSinceLastAttack = this.lastFrameAt - (this.hero.lastAttackTime ?? 0);
+    const attackCooldown = this.hero.attackCooldownMs ?? 0;
+    const elapsedSinceLastAttack = this.lastFrameAt - (this.hero.lastAttackMs ?? 0);
     const attackCooldownRemaining = Math.max(0, attackCooldown - elapsedSinceLastAttack);
     this.renderer.drawText(
       `Hero Attack CD: ${(attackCooldownRemaining / 1000).toFixed(2)}s`,
       12,
       104,
-      { font: '10px monospace', color: '#b9c5d6' }
+      { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
     );
     if (!this.hero.alive) {
       const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
@@ -240,11 +249,11 @@ export class Game {
         `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
         12,
         120,
-        { font: '10px monospace', color: '#ffb3b3' }
+        { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
       );
     }
 
-    if (this.gameOver) {
+    if (this.state === GAME_STATES.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');
     }
   }
