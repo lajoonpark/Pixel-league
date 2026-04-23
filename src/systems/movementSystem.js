@@ -1,5 +1,10 @@
 // Movement system updates entity positions based on velocity.
-import { distanceSquared } from '../utils.js';
+import { clamp, distanceSquared } from '../utils.js';
+
+// Max lane recenter speed, relative to forward move speed.
+const LANE_CORRECTION_SPEED_RATIO = 0.6;
+// Proportional gain for lane recentering based on Y offset.
+const LANE_CORRECTION_MULTIPLIER = 5;
 
 function getLaneForMinion(minion, map) {
   const lanes = map?.lanes ?? [];
@@ -54,9 +59,15 @@ function updateMinionMovement(minion, map, dtSeconds) {
   }
   const moveDirection = minion.team === 'blue' ? 1 : -1;
   minion.vx = moveDirection * minion.moveSpeed;
-  minion.vy = 0;
+  const laneOffsetY = laneCenterY - minion.y;
+  const laneCorrectionSpeed = minion.moveSpeed * LANE_CORRECTION_SPEED_RATIO;
+  minion.vy = clamp(
+    laneOffsetY * LANE_CORRECTION_MULTIPLIER,
+    -laneCorrectionSpeed,
+    laneCorrectionSpeed
+  );
   minion.x += minion.vx * dtSeconds;
-  minion.y = laneCenterY;
+  minion.y += minion.vy * dtSeconds;
 }
 
 export function movementSystem(entities, map, dtSeconds) {
