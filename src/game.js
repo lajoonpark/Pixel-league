@@ -205,7 +205,8 @@ export class Game {
     }
   }
 
-  updateHeroRespawn(nowMs) {    if (this.hero.alive) {
+  updateHeroRespawn(nowMs) {
+    if (this.hero.alive) {
       return;
     }
 
