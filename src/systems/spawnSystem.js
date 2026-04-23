@@ -10,6 +10,10 @@ export function createSpawnSystem(waveConfig) {
 
   let elapsedMs = 0;
   let waveCount = 0;
+  function reset() {
+    elapsedMs = 0;
+    waveCount = 0;
+  }
 
   return {
     update(game, dtMs) {
@@ -44,5 +48,6 @@ export function createSpawnSystem(waveConfig) {
     getWaveCount() {
       return waveCount;
     },
+    reset,
   };
 }

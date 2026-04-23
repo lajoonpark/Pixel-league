@@ -2,7 +2,7 @@
 import { CONFIG } from '../config.js';
 
 export class Base {
-  constructor(x, y, team = 'blue', width = CONFIG.base.width, height = CONFIG.base.height) {
+  constructor(x, y, team = 'blue', width, height) {
     const baseConfig = CONFIG.base;
 
     this.type = 'base';
@@ -12,8 +12,8 @@ export class Base {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.width = width;
-    this.height = height;
+    this.width = width ?? baseConfig.width;
+    this.height = height ?? baseConfig.height;
     this.color = team === 'blue' ? baseConfig.colors.blue : baseConfig.colors.red;
     this.health = baseConfig.health;
     this.maxHealth = baseConfig.health;

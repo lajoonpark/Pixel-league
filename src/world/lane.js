@@ -1,7 +1,7 @@
 // Lane and world layout data for a one-lane MOBA map.
 export function createMainLane(mapConfig, structuresConfig, baseConfig, towerConfig) {
   const centerY = mapConfig.height / 2;
-  const laneWidth = mapConfig.laneWidth;
+  const laneHeight = mapConfig.laneHeight;
   const start = { x: 0, y: centerY };
   const end = { x: mapConfig.width, y: centerY };
   const centerLine = [start, end];
@@ -13,16 +13,16 @@ export function createMainLane(mapConfig, structuresConfig, baseConfig, towerCon
     renderType: 'lane',
     start,
     end,
-    width: laneWidth,
+    width: laneHeight,
     centerLine,
     // Keep legacy aliases while spawn/pathing systems are still converging.
     points: centerLine,
     path: centerLine,
     bounds: {
       x: start.x,
-      y: centerY - laneWidth / 2,
+      y: centerY - laneHeight / 2,
       width: end.x - start.x,
-      height: laneWidth,
+      height: laneHeight,
     },
     placeholders: {
       baseSlots: [

@@ -13,7 +13,7 @@ export const CONFIG = {
     width: 2000,
     height: 1200,
     laneInset: 120,
-    laneWidth: 96,
+    laneHeight: 96,
     sideWidthMultiplier: 2,
     borderWidth: 4,
     colors: {

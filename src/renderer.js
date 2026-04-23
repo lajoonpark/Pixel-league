@@ -130,6 +130,20 @@ export class Renderer {
     this.drawRect(entity);
   }
 
+  getHealthBarColor(entity, healthBarConfig) {
+    if (entity.type === 'tower') {
+      return entity.team === 'blue'
+        ? healthBarConfig.colors.alliedTower
+        : healthBarConfig.colors.enemyTower;
+    }
+    if (entity.type === 'base') {
+      return entity.team === 'blue'
+        ? healthBarConfig.colors.alliedBase
+        : healthBarConfig.colors.enemyBase;
+    }
+    return healthBarConfig.colors[entity.type];
+  }
+
   drawRect(entity) {
     const { x, y } = this.camera.worldToScreen(entity.x, entity.y);
     this.ctx.fillStyle = entity.color;
@@ -164,11 +178,7 @@ export class Renderer {
 
     this.ctx.fillStyle = healthBarConfig.backgroundColor;
     this.ctx.fillRect(barLeft, barTop, barWidth, barHeight);
-    this.ctx.fillStyle = entity.type === 'tower'
-      ? (entity.team === 'blue' ? healthBarConfig.colors.alliedTower : healthBarConfig.colors.enemyTower)
-      : (entity.type === 'base'
-        ? (entity.team === 'blue' ? healthBarConfig.colors.alliedBase : healthBarConfig.colors.enemyBase)
-        : healthBarConfig.colors[entity.type]);
+    this.ctx.fillStyle = this.getHealthBarColor(entity, healthBarConfig);
     this.ctx.fillRect(
       barLeft,
       barTop,

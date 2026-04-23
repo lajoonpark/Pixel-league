@@ -82,13 +82,10 @@ export class Game {
   }
 
   resetMatch() {
-    this.hero = null;
-    this.alliedBase = null;
-    this.enemyBase = null;
     this.entities = [];
     this.state = GAME_STATES.playing;
     this.resultMessage = '';
-    this.spawnSystem = createSpawnSystem(CONFIG.waves);
+    this.spawnSystem.reset();
     this.waveCount = 0;
     this.setupWorld();
     this.input.keys.clear();
@@ -109,7 +106,7 @@ export class Game {
       if (typeof entity.vy === 'number') {
         entity.vy = 0;
       }
-      if ('target' in entity) {
+      if ('target' in entity && entity.alive !== false) {
         entity.target = null;
       }
     }
