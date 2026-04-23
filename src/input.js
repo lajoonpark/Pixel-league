@@ -9,6 +9,7 @@ export class Input {
       moveRight: ['KeyD', 'ArrowRight'],
       moveUp: ['KeyW', 'ArrowUp'],
       moveDown: ['KeyS', 'ArrowDown'],
+      attack: ['Space'],
     };
   }
 
@@ -40,5 +41,9 @@ export class Input {
       x: this.axis(this.bindings.moveLeft, this.bindings.moveRight),
       y: this.axis(this.bindings.moveUp, this.bindings.moveDown),
     };
+  }
+
+  isAttackPressed() {
+    return this.isAnyPressed(this.bindings.attack);
   }
 }

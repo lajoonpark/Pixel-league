@@ -99,7 +99,7 @@ export class Renderer {
 
   drawHealthBar(entity) {
     if (
-      (entity.type !== 'minion' && entity.type !== 'tower' && entity.type !== 'base')
+      (entity.type !== 'hero' && entity.type !== 'minion' && entity.type !== 'tower' && entity.type !== 'base')
       || (typeof entity.alive === 'boolean' && !entity.alive)
       || entity.health <= 0
       || typeof entity.health !== 'number'

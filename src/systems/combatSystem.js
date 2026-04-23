@@ -13,8 +13,12 @@ function isLivingBase(entity) {
   return entity?.type === 'base' && entity.alive && entity.health > 0;
 }
 
+function isLivingHero(entity) {
+  return entity?.type === 'hero' && entity.health > 0;
+}
+
 function isCombatAttacker(entity) {
-  return isLivingMinion(entity) || isLivingTower(entity);
+  return isLivingMinion(entity) || isLivingTower(entity) || isLivingHero(entity);
 }
 
 function isValidTarget(attacker, target) {
@@ -32,6 +36,10 @@ function getAttackCooldown(attacker) {
 export function combatSystem(entities, nowMs) {
   for (const attacker of entities) {
     if (!isCombatAttacker(attacker)) {
+      continue;
+    }
+
+    if (attacker.type === 'hero' && !attacker.isAttackRequested) {
       continue;
     }
 
@@ -67,6 +75,9 @@ export function combatSystem(entities, nowMs) {
     }
 
     if (nowMs - attacker.lastAttackAt < getAttackCooldown(attacker)) {
+      if (attacker.type === 'hero') {
+        attacker.isAttackRequested = false;
+      }
       continue;
     }
 
@@ -75,5 +86,9 @@ export function combatSystem(entities, nowMs) {
       attacker.target.alive = false;
     }
     attacker.lastAttackAt = nowMs;
+    attacker.lastAttackTime = nowMs;
+    if (attacker.type === 'hero') {
+      attacker.isAttackRequested = false;
+    }
   }
 }
