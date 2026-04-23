@@ -185,8 +185,8 @@ export class Game {
       { font: '10px monospace', color: '#b9c5d6' }
     );
     const attackCooldownMs = this.hero.attackCooldown ?? 0;
-    const elapsedSinceAttack = this.lastFrameAt - (this.hero.lastAttackTime ?? 0);
-    const attackCooldownRemaining = Math.max(0, attackCooldownMs - elapsedSinceAttack);
+    const elapsedSinceLastAttack = this.lastFrameAt - (this.hero.lastAttackTime ?? 0);
+    const attackCooldownRemaining = Math.max(0, attackCooldownMs - elapsedSinceLastAttack);
     this.renderer.drawText(
       `Hero Attack CD: ${(attackCooldownRemaining / 1000).toFixed(2)}s`,
       12,

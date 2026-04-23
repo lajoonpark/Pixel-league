@@ -51,8 +51,12 @@ export function combatSystem(entities, nowMs) {
       continue;
     }
 
-    if (attacker.type === 'hero' && !attacker.isAttackRequested) {
-      continue;
+    if (attacker.type === 'hero') {
+      const heroAttackRequested = attacker.isAttackRequested;
+      attacker.isAttackRequested = false;
+      if (!heroAttackRequested) {
+        continue;
+      }
     }
 
     const attackRangeSq = attacker.attackRange * attacker.attackRange;
@@ -87,9 +91,6 @@ export function combatSystem(entities, nowMs) {
     }
 
     if (nowMs - getLastAttackTime(attacker) < getAttackCooldown(attacker)) {
-      if (attacker.type === 'hero') {
-        attacker.isAttackRequested = false;
-      }
       continue;
     }
 
@@ -98,8 +99,5 @@ export function combatSystem(entities, nowMs) {
       attacker.target.alive = false;
     }
     setLastAttackTime(attacker, nowMs);
-    if (attacker.type === 'hero') {
-      attacker.isAttackRequested = false;
-    }
   }
 }
