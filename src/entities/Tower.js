@@ -10,7 +10,7 @@ export class Tower {
     this.maxHealth = 420;
     this.health = this.maxHealth;
     this.attackRange = 180;
-    this.attackDamage = 14;
+    this.attackDamage = 100;
     this.attackCooldown = 1100;
     this.alive = true;
     this.lastAttackAt = 0;
