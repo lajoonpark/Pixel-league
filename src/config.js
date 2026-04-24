@@ -37,7 +37,7 @@ export const CONFIG = {
     baseEdgePadding: 14,
   },
   waves: {
-    spawnIntervalMs: 30000,
+    spawnIntervalMs: 15000,
     // Number of minions spawned per team per wave, arranged in a line.
     spawnCount: 9,
     // Gap between consecutive minions along the lane axis.
