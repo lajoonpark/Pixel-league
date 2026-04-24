@@ -1,5 +1,6 @@
 // Central configuration file for gameplay and rendering tuning.
 export const GAME_STATES = {
+  menu: 'menu',
   playing: 'playing',
   gameOver: 'gameOver',
 };

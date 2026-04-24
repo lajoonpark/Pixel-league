@@ -1,6 +1,7 @@
 // Game orchestrates state, systems, update loop, and rendering.
 import { CONFIG, GAME_STATES } from './config.js';
 import { Input } from './input.js';
+import { Menu } from './menu.js';
 import { Renderer } from './renderer.js';
 import { Camera } from './camera.js';
 import { Hero } from './entities/Hero.js';
@@ -26,10 +27,10 @@ export class Game {
     this.fps = 0;
     this.waveCount = 0;
     this.wasAttackPressed = false;
-    this.state = GAME_STATES.playing;
+    this.state = GAME_STATES.menu;
     this.resultMessage = '';
 
-    this.setupWorld();
+    this.menu = new Menu(canvas, () => this._startGame());
   }
 
   setupWorld() {
@@ -76,6 +77,15 @@ export class Game {
     };
   }
 
+  // Called once by the Menu's Play button – transitions from menu to playing.
+  _startGame() {
+    this.menu.detach();
+    this.setupWorld();
+    this.state = GAME_STATES.playing;
+    this.input.attach();
+    this.camera.follow(this.hero);
+  }
+
   resetMatch() {
     this.entities = [];
     this.state = GAME_STATES.playing;
@@ -118,7 +128,7 @@ export class Game {
   }
 
   start() {
-    this.input.attach();
+    this.menu.attach();
     requestAnimationFrame((timestamp) => {
       this.lastFrameAt = timestamp;
       this.loop(timestamp);
@@ -134,6 +144,10 @@ export class Game {
   }
 
   update(dtMs, nowMs) {
+    if (this.state === GAME_STATES.menu) {
+      return;
+    }
+
     if (this.state === GAME_STATES.gameOver) {
       if (this.input.isPressed('KeyR')) {
         this.resetMatch();
@@ -232,6 +246,11 @@ export class Game {
   }
 
   render() {
+    if (this.state === GAME_STATES.menu) {
+      this.menu.render();
+      return;
+    }
+
     this.renderer.clear();
     this.renderer.drawMap(this.map);
 
