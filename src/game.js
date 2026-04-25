@@ -13,6 +13,7 @@ import { movementSystem } from './systems/movementSystem.js';
 import { collisionSystem } from './systems/collisionSystem.js';
 import { combatSystem } from './systems/combatSystem.js';
 import { healthSystem } from './systems/healthSystem.js';
+import { EffectSystem } from './systems/effectSystem.js';
 
 export class Game {
   constructor(canvas) {
@@ -23,6 +24,7 @@ export class Game {
     this.renderer = new Renderer(canvas, this.camera, CONFIG);
     this.entities = [];
     this.spawnSystem = createSpawnSystem(CONFIG.waves);
+    this.effectSystem = new EffectSystem();
     this.lastFrameAt = 0;
     this.fps = 0;
     this.waveCount = 0;
@@ -92,6 +94,7 @@ export class Game {
     this.resultMessage = '';
     this.spawnSystem.reset();
     this.waveCount = 0;
+    this.effectSystem.effects = [];
     this.setupWorld();
     this.input.keys.clear();
     this.wasAttackPressed = false;
@@ -139,7 +142,7 @@ export class Game {
     const dtMs = timestamp - this.lastFrameAt;
     this.lastFrameAt = timestamp;
     this.update(dtMs, timestamp);
-    this.render();
+    this.render(timestamp);
     requestAnimationFrame((nextTimestamp) => this.loop(nextTimestamp));
   }
 
@@ -161,6 +164,9 @@ export class Game {
     const attackPressed = this.input.isAttackPressed();
     if (this.hero.alive && attackPressed && !this.wasAttackPressed) {
       this.hero.isAttackRequested = true;
+      // Start the diagonal sword animation.
+      this.hero.attackAnimPhase = 'windUp';
+      this.hero.attackAnimStartMs = nowMs;
     }
     this.wasAttackPressed = attackPressed;
 
@@ -170,6 +176,8 @@ export class Game {
     this.spawnSystem.update(this, dtMs);
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
+    this._advanceHeroAttackAnim(nowMs);
+    this.effectSystem.update(nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
     healthSystem(this.entities, nowMs);
@@ -243,9 +251,54 @@ export class Game {
     this.hero.target = null;
     this.hero.isAttackRequested = false;
     this.hero.respawnAtMs = 0;
+    this.hero.attackAnimPhase = 'idle';
+    this.hero.attackAnimStartMs = 0;
+    this.hero.pendingHitTarget = null;
   }
 
-  render() {
+  // Advance the hero's attack-animation phase based on elapsed time and spawn
+  // the slash-arc crescent + optional hit-spark when the swing connects.
+  _advanceHeroAttackAnim(nowMs) {
+    const hero = this.hero;
+    if (hero.attackAnimPhase === 'idle') { return; }
+
+    const anim = CONFIG.attackAnim;
+    const elapsed = nowMs - hero.attackAnimStartMs;
+    const windUpEnd = anim.windUpMs;
+    const swingEnd = windUpEnd + anim.swingMs;
+    const followThroughEnd = swingEnd + anim.followThroughMs;
+    const returnEnd = followThroughEnd + anim.returnMs;
+
+    if (hero.attackAnimPhase === 'windUp' && elapsed >= windUpEnd) {
+      hero.attackAnimPhase = 'swing';
+    } else if (hero.attackAnimPhase === 'swing' && elapsed >= swingEnd) {
+      hero.attackAnimPhase = 'followThrough';
+      // Spawn slash-arc crescent centred on the hero.
+      this.effectSystem.spawn('slashArc', hero.x, hero.y, nowMs, {
+        durationMs: anim.slashArcDurationMs,
+        arcRadiusStart: anim.arcRadiusStart,
+        arcRadiusEnd: anim.arcRadiusEnd,
+      });
+      // Spawn hit spark at the target's position if the attack connected.
+      if (hero.pendingHitTarget) {
+        const target = hero.pendingHitTarget;
+        hero.pendingHitTarget = null;
+        this.effectSystem.spawn('hitSpark', target.x, target.y, nowMs, {
+          durationMs: anim.sparkDurationMs,
+          rayCount: anim.sparkRayCount,
+          maxRadius: anim.sparkMaxRadius,
+          pixelSize: anim.sparkPixelSize,
+          colors: anim.sparkColors,
+        });
+      }
+    } else if (hero.attackAnimPhase === 'followThrough' && elapsed >= followThroughEnd) {
+      hero.attackAnimPhase = 'return';
+    } else if (hero.attackAnimPhase === 'return' && elapsed >= returnEnd) {
+      hero.attackAnimPhase = 'idle';
+    }
+  }
+
+  render(nowMs) {
     if (this.state === GAME_STATES.menu) {
       this.menu.render();
       return;
@@ -254,9 +307,17 @@ export class Game {
     this.renderer.clear();
     this.renderer.drawMap(this.map);
 
+    // Store nowMs on the renderer so drawEntity/drawHeroSword can read it
+    // without changing every call signature.
+    this.renderer.nowMs = nowMs;
+
     for (const entity of this.entities) {
       this.renderer.drawEntity(entity);
       this.renderer.drawHealthBar(entity);
+    }
+
+    for (const effect of this.effectSystem.effects) {
+      this.renderer.drawEffect(effect);
     }
 
     this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);

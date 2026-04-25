@@ -6,6 +6,8 @@ export class Renderer {
     this.camera = camera;
     this.config = config;
     this.spriteRegistry = config.rendering.sprites;
+    // Set by game.js at the start of each render call so draw methods can read it.
+    this.nowMs = 0;
   }
 
   clear() {
@@ -188,9 +190,14 @@ export class Renderer {
 
     if (this.canRenderSprite(entity)) {
       this.drawSprite(entity);
-      return;
+    } else {
+      this.drawRect(entity);
     }
-    this.drawRect(entity);
+
+    // Draw the sword overlay on top of the hero body in all animation phases.
+    if (entity.type === 'hero') {
+      this.drawHeroSword(entity);
+    }
   }
 
   getHealthBarColor(entity, healthBarConfig) {
@@ -248,6 +255,177 @@ export class Renderer {
       Math.round(barWidth * ratio),
       barHeight
     );
+  }
+
+  // ── attack animation ─────────────────────────────────────────────────────────
+
+  // Draw the hero's sword blade as a short pixel line whose angle changes with
+  // the current attackAnimPhase.  Angles are measured clockwise from East
+  // (standard canvas convention; y-axis points down).
+  drawHeroSword(hero) {
+    const nowMs = this.nowMs;
+    const anim = this.config.attackAnim;
+    const { x: cx, y: cy } = this.camera.worldToScreen(hero.x, hero.y);
+    const ctx = this.ctx;
+
+    // Canonical blade angles (radians, clockwise-from-right in screen space).
+    const IDLE_ANGLE = -Math.PI / 4;          // upper-right  (−45°)
+    const WIND_UP_ANGLE = -Math.PI * 3 / 4;   // upper-left   (−135°)
+    const FOLLOW_ANGLE = Math.PI / 4;          // lower-right  (+45°)
+
+    const elapsed = nowMs - hero.attackAnimStartMs;
+    let angle = IDLE_ANGLE;
+
+    if (hero.attackAnimPhase === 'windUp') {
+      const t = Math.min(elapsed / anim.windUpMs, 1);
+      angle = IDLE_ANGLE + (WIND_UP_ANGLE - IDLE_ANGLE) * t;
+    } else if (hero.attackAnimPhase === 'swing') {
+      const swingElapsed = elapsed - anim.windUpMs;
+      const t = Math.min(swingElapsed / anim.swingMs, 1);
+      angle = WIND_UP_ANGLE + (FOLLOW_ANGLE - WIND_UP_ANGLE) * t;
+    } else if (hero.attackAnimPhase === 'followThrough') {
+      angle = FOLLOW_ANGLE;
+    } else if (hero.attackAnimPhase === 'return') {
+      const returnElapsed = elapsed - anim.windUpMs - anim.swingMs - anim.followThroughMs;
+      const t = Math.min(returnElapsed / anim.returnMs, 1);
+      angle = FOLLOW_ANGLE + (IDLE_ANGLE - FOLLOW_ANGLE) * t;
+    }
+
+    const length = anim.swordLength;
+    const hiltOffset = 4;
+    const tipX = cx + Math.cos(angle) * length;
+    const tipY = cy + Math.sin(angle) * length;
+    const hiltX = cx - Math.cos(angle) * hiltOffset;
+    const hiltY = cy - Math.sin(angle) * hiltOffset;
+
+    ctx.save();
+    // Blade gleams white during the swing; silver otherwise.
+    ctx.strokeStyle = hero.attackAnimPhase === 'swing' ? '#ffffff' : '#d0d8e8';
+    ctx.lineWidth = anim.swordThickness;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(Math.round(hiltX), Math.round(hiltY));
+    ctx.lineTo(Math.round(tipX), Math.round(tipY));
+    ctx.stroke();
+    // Hilt guard: small dark pixel at the crossguard position.
+    ctx.fillStyle = '#5a4a2a';
+    ctx.fillRect(Math.round(hiltX) - 1, Math.round(hiltY) - 1, 3, 3);
+    ctx.restore();
+  }
+
+  // Slash-arc crescent that sweeps diagonally from upper-left to lower-right.
+  // Phase 1 (progress 0–0.6): growing arc stroke.
+  // Phase 2 (progress 0.6–1.0): arc dissolves into scattered 2×2 pixels.
+  drawSlashArc(effect) {
+    const nowMs = this.nowMs;
+    const elapsed = nowMs - effect.startMs;
+    const progress = Math.min(elapsed / effect.durationMs, 1);
+
+    const { x: cx, y: cy } = this.camera.worldToScreen(effect.x, effect.y);
+    const ctx = this.ctx;
+
+    // Arc spans 180° from upper-left to lower-right passing through the upper half.
+    const ARC_START = -Math.PI * 3 / 4; // upper-left  (−135°)
+    const ARC_END = Math.PI / 4;         // lower-right  (+45°)
+
+    const radius = effect.arcRadiusStart
+      + (effect.arcRadiusEnd - effect.arcRadiusStart) * Math.min(progress / 0.6, 1);
+
+    ctx.save();
+
+    if (progress <= 0.6) {
+      // Growing crescent stroke that reveals itself progressively.
+      const sweepEnd = ARC_START + (ARC_END - ARC_START) * (progress / 0.6);
+      ctx.globalAlpha = 1 - progress * 0.4;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(Math.round(cx), Math.round(cy), radius, ARC_START, sweepEnd);
+      ctx.stroke();
+    } else {
+      // Dissolve into deterministic 2×2 pixel scatter along the arc edge.
+      const fadeProgress = (progress - 0.6) / 0.4;
+      ctx.globalAlpha = 1 - fadeProgress;
+      ctx.fillStyle = '#c8d0e0';
+      const pixelCount = 8;
+      for (let i = 0; i < pixelCount; i++) {
+        const t = i / (pixelCount - 1);
+        const a = ARC_START + (ARC_END - ARC_START) * t;
+        // Alternate inner/outer spread for a pixel-art scatter feel.
+        const r = radius + (i % 2 === 0 ? 3 : -2);
+        ctx.fillRect(Math.round(cx + Math.cos(a) * r) - 1, Math.round(cy + Math.sin(a) * r) - 1, 2, 2);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // Hit-spark burst centred on the struck target's world position.
+  // Phase 1 (progress 0–0.4): bright radiating lines from centre.
+  // Phase 2 (progress 0.4–1.0): lines dissolve into drifting pixel dots.
+  drawHitSpark(effect) {
+    const nowMs = this.nowMs;
+    const elapsed = nowMs - effect.startMs;
+    const progress = Math.min(elapsed / effect.durationMs, 1);
+
+    const { x: cx, y: cy } = this.camera.worldToScreen(effect.x, effect.y);
+    const ctx = this.ctx;
+    const { rayCount, maxRadius, pixelSize, colors } = effect;
+
+    ctx.save();
+
+    if (progress <= 0.4) {
+      // Bright radiating lines.
+      const burstProgress = progress / 0.4;
+      ctx.globalAlpha = 1 - burstProgress * 0.3;
+      ctx.strokeStyle = colors[0];
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'square';
+      const lineLength = maxRadius * (1 - burstProgress);
+      const innerR = lineLength * 0.2;
+      for (let i = 0; i < rayCount; i++) {
+        const angle = (Math.PI * 2 * i) / rayCount;
+        ctx.beginPath();
+        ctx.moveTo(
+          Math.round(cx + Math.cos(angle) * innerR),
+          Math.round(cy + Math.sin(angle) * innerR)
+        );
+        ctx.lineTo(
+          Math.round(cx + Math.cos(angle) * lineLength),
+          Math.round(cy + Math.sin(angle) * lineLength)
+        );
+        ctx.stroke();
+      }
+      // Bright white centre pixel.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(cx) - 2, Math.round(cy) - 2, 4, 4);
+    } else {
+      // Dissolving pixel dots that drift outward.
+      const fadeProgress = (progress - 0.4) / 0.6;
+      ctx.globalAlpha = 1 - fadeProgress;
+      const colorIndex = Math.min(Math.floor(fadeProgress * colors.length), colors.length - 1);
+      ctx.fillStyle = colors[colorIndex];
+      const r = maxRadius * (0.4 + fadeProgress * 0.6);
+      for (let i = 0; i < rayCount; i++) {
+        // Slowly rotate dots outward using fadeProgress for drift.
+        const angle = (Math.PI * 2 * i) / rayCount + fadeProgress * 0.5;
+        const px = Math.round(cx + Math.cos(angle) * r);
+        const py = Math.round(cy + Math.sin(angle) * r);
+        ctx.fillRect(px, py, pixelSize, pixelSize);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // Dispatch table for transient effects.
+  drawEffect(effect) {
+    if (effect.type === 'slashArc') {
+      this.drawSlashArc(effect);
+    } else if (effect.type === 'hitSpark') {
+      this.drawHitSpark(effect);
+    }
   }
 
   drawText(text, x, y, options = {}) {
