@@ -28,5 +28,10 @@ export class Hero {
     // True while Space is held; drives the range-circle overlay.
     this.showRangeCircle = false;
     this.respawnAtMs = 0;
+    // Attack animation state.
+    this.attackAnimPhase = 'idle'; // idle | windUp | swing | followThrough | return
+    this.attackAnimStartMs = 0;
+    // Set by combatSystem when the hero lands a hit; consumed by game.js to spawn the hit spark.
+    this.pendingHitTarget = null;
   }
 }

@@ -139,5 +139,9 @@ export function combatSystem(entities, nowMs) {
       attacker.target.alive = false;
     }
     setLastAttackTime(attacker, nowMs);
+    // Let the hero carry the hit target so game.js can spawn a hit-spark effect.
+    if (attacker.type === 'hero') {
+      attacker.pendingHitTarget = attacker.target;
+    }
   }
 }

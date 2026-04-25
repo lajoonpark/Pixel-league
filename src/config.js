@@ -57,6 +57,27 @@ export const CONFIG = {
     spawnLaneOffsetX: 60,
     color: '#4aa8ff',
   },
+  // Timing and visual constants for the hero's basic attack animation.
+  attackAnim: {
+    // Phase durations in milliseconds.
+    windUpMs: 100,
+    swingMs: 160,
+    followThroughMs: 100,
+    returnMs: 200,
+    // Sword geometry (pixels, screen space).
+    swordLength: 14,
+    swordThickness: 2,
+    // Slash-arc crescent effect.
+    arcRadiusStart: 18,
+    arcRadiusEnd: 28,
+    slashArcDurationMs: 220,
+    // Hit-spark burst effect.
+    sparkRayCount: 8,
+    sparkMaxRadius: 24,
+    sparkPixelSize: 2,
+    sparkDurationMs: 280,
+    sparkColors: ['#ffee55', '#ff9900', '#ff4400'],
+  },
   minion: {
     renderType: 'minion',
     width: 12,
