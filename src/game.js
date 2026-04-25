@@ -176,6 +176,20 @@ export class Game {
     this.spawnSystem.update(this, dtMs);
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
+    // Spawn the hit spark immediately when the hero's attack lands, regardless
+    // of animation phase, so spamming space never drops the visual feedback.
+    if (this.hero.pendingHitTarget) {
+      const target = this.hero.pendingHitTarget;
+      this.hero.pendingHitTarget = null;
+      const anim = CONFIG.attackAnim;
+      this.effectSystem.spawn('hitSpark', target.x, target.y, nowMs, {
+        durationMs: anim.sparkDurationMs,
+        rayCount: anim.sparkRayCount,
+        maxRadius: anim.sparkMaxRadius,
+        pixelSize: anim.sparkPixelSize,
+        colors: anim.sparkColors,
+      });
+    }
     this._advanceHeroAttackAnim(nowMs);
     this.effectSystem.update(nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
@@ -279,18 +293,6 @@ export class Game {
         arcRadiusStart: anim.arcRadiusStart,
         arcRadiusEnd: anim.arcRadiusEnd,
       });
-      // Spawn hit spark at the target's position if the attack connected.
-      if (hero.pendingHitTarget) {
-        const target = hero.pendingHitTarget;
-        hero.pendingHitTarget = null;
-        this.effectSystem.spawn('hitSpark', target.x, target.y, nowMs, {
-          durationMs: anim.sparkDurationMs,
-          rayCount: anim.sparkRayCount,
-          maxRadius: anim.sparkMaxRadius,
-          pixelSize: anim.sparkPixelSize,
-          colors: anim.sparkColors,
-        });
-      }
     } else if (hero.attackAnimPhase === 'followThrough' && elapsed >= followThroughEnd) {
       hero.attackAnimPhase = 'return';
     } else if (hero.attackAnimPhase === 'return' && elapsed >= returnEnd) {
