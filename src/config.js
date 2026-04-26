@@ -109,6 +109,31 @@ export const CONFIG = {
       red: '#ff7a7a',
     },
   },
+  // Visual parameters for the energy-blast projectile fired by towers and bases.
+  energyBlast: {
+    // Travel speed in world-pixels per second.
+    speedPxPerSec: 300,
+    // Radius of the bright orb at the projectile head (screen pixels).
+    headRadius: 5,
+    // Number of trail segments drawn behind the head.
+    trailSegments: 7,
+    // Maximum length of the comet trail (screen pixels).
+    trailLengthPx: 28,
+    // Size of each scatter pixel that dissolves on arrival.
+    scatterPixelSize: 2,
+    colors: {
+      blue: {
+        head: '#ffffff',
+        glow: '#88ccff',
+        trail: ['#4aa8ff', '#1a6aff', '#0a3fbf', '#06266e'],
+      },
+      red: {
+        head: '#ffffff',
+        glow: '#ffaaaa',
+        trail: ['#ff7a7a', '#ff3030', '#bf1010', '#6e0606'],
+      },
+    },
+  },
   base: {
     renderType: 'base',
     width: 88,

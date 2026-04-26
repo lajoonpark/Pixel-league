@@ -143,5 +143,9 @@ export function combatSystem(entities, nowMs) {
     if (attacker.type === 'hero') {
       attacker.pendingHitTarget = attacker.target;
     }
+    // Tag towers and bases so game.js can spawn the energy-blast projectile effect.
+    if ((attacker.type === 'tower' || attacker.type === 'base') && attacker.target) {
+      attacker.pendingBlastTarget = { x: attacker.target.x, y: attacker.target.y };
+    }
   }
 }

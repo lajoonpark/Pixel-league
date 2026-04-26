@@ -419,12 +419,125 @@ export class Renderer {
     ctx.restore();
   }
 
+  // Energy-blast comet projectile fired by towers and bases.
+  // Phase 1 (progress 0–0.85): bright orb + pixel-art comet trail flies from
+  //   source to target.
+  // Phase 2 (progress 0.85–1.0): orb dissolves into radiating scatter pixels
+  //   at the impact point.
+  drawEnergyBlast(effect) {
+    const nowMs = this.nowMs;
+    const elapsed = nowMs - effect.startMs;
+    const progress = Math.min(elapsed / effect.durationMs, 1);
+    const ctx = this.ctx;
+    const blastCfg = this.config.energyBlast;
+    const palette = blastCfg.colors[effect.team] ?? blastCfg.colors.blue;
+
+    // World-space head position interpolated along the flight path.
+    const worldHeadX = effect.x + (effect.toX - effect.x) * progress;
+    const worldHeadY = effect.y + (effect.toY - effect.y) * progress;
+    const { x: headX, y: headY } = this.camera.worldToScreen(worldHeadX, worldHeadY);
+
+    // Direction unit vector (screen coords).
+    const { x: fromSX, y: fromSY } = this.camera.worldToScreen(effect.x, effect.y);
+    const { x: toSX, y: toSY } = this.camera.worldToScreen(effect.toX, effect.toY);
+    const totalDX = toSX - fromSX;
+    const totalDY = toSY - fromSY;
+    const totalLen = Math.hypot(totalDX, totalDY) || 1;
+    const dirX = totalDX / totalLen;
+    const dirY = totalDY / totalLen;
+
+    const IMPACT_PHASE = 0.85;
+
+    ctx.save();
+
+    if (progress < IMPACT_PHASE) {
+      // ── Comet trail (drawn first so the orb sits on top) ──────────────────
+      const trailColors = palette.trail;
+      const segCount = blastCfg.trailSegments;
+      const trailLen = Math.min(blastCfg.trailLengthPx, totalLen * progress);
+
+      for (let i = 0; i < segCount; i++) {
+        const t = (i + 1) / segCount;               // 0 = head, 1 = tail tip
+        const segX = headX - dirX * trailLen * t;
+        const segY = headY - dirY * trailLen * t;
+        const alpha = (1 - t) * (1 - progress * 0.2);
+        const size = Math.max(1, Math.round((1 - t) * 3));
+        const colorIdx = Math.min(Math.floor(t * trailColors.length), trailColors.length - 1);
+
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = trailColors[colorIdx];
+        ctx.fillRect(Math.round(segX) - size, Math.round(segY) - size, size * 2, size * 2);
+
+        // Scatter a 1-px accent pixel beside every other segment for pixel-art sparkle.
+        if (i % 2 === 0 && alpha > 0.3) {
+          ctx.globalAlpha = alpha * 0.5;
+          ctx.fillStyle = palette.glow;
+          ctx.fillRect(
+            Math.round(segX) + (i % 4 === 0 ? 2 : -2),
+            Math.round(segY) - 1,
+            blastCfg.scatterPixelSize,
+            blastCfg.scatterPixelSize
+          );
+        }
+      }
+
+      // ── Outer glow ring ────────────────────────────────────────────────────
+      const r = blastCfg.headRadius;
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = palette.glow;
+      ctx.beginPath();
+      ctx.arc(Math.round(headX), Math.round(headY), r + 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ── Bright orb core ────────────────────────────────────────────────────
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = palette.head;
+      ctx.beginPath();
+      ctx.arc(Math.round(headX), Math.round(headY), r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White centre highlight pixel.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(headX) - 1, Math.round(headY) - 1, 2, 2);
+    } else {
+      // ── Impact dissolution: scatter pixels radiate from the target ─────────
+      const { x: impactX, y: impactY } = this.camera.worldToScreen(effect.toX, effect.toY);
+      const fadeProgress = (progress - IMPACT_PHASE) / (1 - IMPACT_PHASE);
+      const rayCount = 8;
+      const maxR = blastCfg.headRadius * 3 + fadeProgress * 10;
+      const trailColors = palette.trail;
+
+      for (let i = 0; i < rayCount; i++) {
+        const angle = (Math.PI * 2 * i) / rayCount + fadeProgress * 0.4;
+        const r2 = maxR * fadeProgress;
+        const px = Math.round(impactX + Math.cos(angle) * r2);
+        const py = Math.round(impactY + Math.sin(angle) * r2);
+        const colorIdx = Math.min(Math.floor(fadeProgress * trailColors.length), trailColors.length - 1);
+
+        ctx.globalAlpha = (1 - fadeProgress) * 0.9;
+        ctx.fillStyle = trailColors[colorIdx];
+        ctx.fillRect(px, py, blastCfg.scatterPixelSize, blastCfg.scatterPixelSize);
+      }
+
+      // Fading centre flash.
+      ctx.globalAlpha = (1 - fadeProgress) * 0.7;
+      ctx.fillStyle = palette.glow;
+      ctx.beginPath();
+      ctx.arc(Math.round(impactX), Math.round(impactY), blastCfg.headRadius * (1 - fadeProgress * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
   // Dispatch table for transient effects.
   drawEffect(effect) {
     if (effect.type === 'slashArc') {
       this.drawSlashArc(effect);
     } else if (effect.type === 'hitSpark') {
       this.drawHitSpark(effect);
+    } else if (effect.type === 'energyBlast') {
+      this.drawEnergyBlast(effect);
     }
   }
 

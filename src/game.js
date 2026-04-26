@@ -190,6 +190,24 @@ export class Game {
         colors: anim.sparkColors,
       });
     }
+    // Spawn energy-blast projectiles for towers and bases that just fired.
+    const blastCfg = CONFIG.energyBlast;
+    for (const entity of this.entities) {
+      if (!entity.pendingBlastTarget) { continue; }
+      const tgt = entity.pendingBlastTarget;
+      entity.pendingBlastTarget = null;
+      const dx = tgt.x - entity.x;
+      const dy = tgt.y - entity.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1) { continue; }
+      const durationMs = (dist / blastCfg.speedPxPerSec) * 1000;
+      this.effectSystem.spawn('energyBlast', entity.x, entity.y, nowMs, {
+        durationMs,
+        toX: tgt.x,
+        toY: tgt.y,
+        team: entity.team,
+      });
+    }
     this._advanceHeroAttackAnim(nowMs);
     this.effectSystem.update(nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
