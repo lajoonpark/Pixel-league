@@ -127,95 +127,120 @@ function drawMinion(ctx, team) {
   r(ctx, 19, 0, 2, 4, METAL);
 }
 
-// ─── tower (40 × 40, stone tower with gem) ───────────────────────────────────
+// ─── tower (48 × 48, stone castle tower with gem) ────────────────────────────
 function drawTower(ctx, team) {
-  const GEM = team === 'blue' ? '#4499ff' : '#ff4444';
-  const GEML = team === 'blue' ? '#88ccff' : '#ff8888';
-  const GEMD = team === 'blue' ? '#1155aa' : '#aa1111';
+  const GEM  = team === 'blue' ? '#2299ff' : '#ff4400';
+  const GEML = team === 'blue' ? '#88ccff' : '#ffaa44';
+  const GEMD = team === 'blue' ? '#0044aa' : '#aa1100';
 
-  // shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  // drop shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
-  ctx.ellipse(20, 39, 13, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(24, 46, 18, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // base platform
-  r(ctx, 4, 30, 32, 10, STONE_D);
-  r(ctx, 4, 30, 32, 7, STONE);
-  for (let x = 4; x < 36; x += 7) { r(ctx, x, 30, 1, 7, STONE_D); }
+  // wide stone base platform
+  r(ctx, 4, 37, 40, 11, STONE_D);
+  r(ctx, 4, 35, 40, 9, STONE);
+  r(ctx, 5, 35, 38, 1, STONE_L);                         // top-edge highlight
+  for (let x = 4; x < 44; x += 9) { r(ctx, x, 35, 1, 9, STONE_D); } // vertical dividers
 
-  // tower body
-  r(ctx, 8, 13, 24, 18, STONE);
-  // brick rows
-  for (let y = 13; y < 31; y += 6) {
-    r(ctx, 8, y, 24, 1, STONE_D);
-    for (let x = 8; x < 32; x += 9) { r(ctx, x, y, 1, 6, STONE_D); }
+  // tower body (x 10-37, y 16-36)
+  r(ctx, 10, 16, 28, 21, STONE);
+  r(ctx, 10, 16, 2, 21, STONE_D);                        // left-side shading
+  r(ctx, 36, 16, 2, 21, STONE_D);                        // right-side shading
+  r(ctx, 12, 17, 3, 19, STONE_L);                        // left highlight strip
+  // horizontal brick rows + offset vertical dividers
+  for (let y = 16; y < 37; y += 6) {
+    r(ctx, 10, y, 28, 1, STONE_D);
+    const off = (Math.floor((y - 16) / 6) % 2 === 0) ? 0 : 5;
+    for (let x = 10 + off; x < 38; x += 10) { r(ctx, x, y, 1, 6, STONE_D); }
   }
 
-  // battlements
-  for (const bx of [6, 13, 20, 27]) { r(ctx, bx, 9, 5, 5, STONE_L); }
-  r(ctx, 6, 9, 28, 2, STONE_D);
+  // battlements – 4 merlons with 3 dark crenels
+  for (const bx of [10, 17, 24, 31]) { r(ctx, bx, 10, 6, 6, STONE_L); }
+  for (const gx of [16, 23, 30])     { r(ctx, gx, 10, 1, 6, '#1a1410'); }
+  r(ctx, 10, 15, 28, 2, STONE_D);                        // battlement base
 
-  // arrow slits
-  r(ctx, 14, 18, 5, 9, '#1a1410');
-  r(ctx, 21, 18, 5, 9, '#1a1410');
+  // dark entrance arch
+  r(ctx, 20, 22, 8, 2, '#1a1410');                       // arch top
+  r(ctx, 19, 23, 10, 13, '#1a1410');                     // arch body
 
-  // gem / crystal
-  r(ctx, 16, 1, 8, 10, GEMD);
-  r(ctx, 17, 0, 6, 10, GEM);
-  r(ctx, 18, 1, 3, 4, GEML);
-  r(ctx, 16, 5, 2, 6, GEMD);
-  r(ctx, 22, 5, 2, 6, GEMD);
+  // pointed gem / crystal (centred at x 24)
+  r(ctx, 23,  0, 2, 1, GEM);   // very tip
+  r(ctx, 22,  1, 4, 2, GEM);
+  r(ctx, 21,  3, 6, 2, GEM);
+  r(ctx, 20,  5, 8, 3, GEM);   // widest band
+  r(ctx, 21,  8, 6, 2, GEM);
+  r(ctx, 22, 10, 4, 1, GEMD);  // lower taper
+  // highlight (upper-left face)
+  r(ctx, 22, 1, 2, 2, GEML);
+  r(ctx, 21, 3, 3, 2, GEML);
+  r(ctx, 20, 5, 3, 2, GEML);
+  // dark right-edge shading
+  r(ctx, 27, 5, 1, 5, GEMD);
+  r(ctx, 26, 8, 2, 2, GEMD);
 }
 
 // ─── base / castle (88 × 64) ─────────────────────────────────────────────────
 function drawBase(ctx, team, w, h) {
-  const ROOF = team === 'blue' ? BLUE : RED;
+  const ROOF  = team === 'blue' ? BLUE   : RED;
   const ROOFL = team === 'blue' ? BLUE_L : RED_L;
   const ROOFD = team === 'blue' ? BLUE_D : RED_D;
 
-  // shadow
-  r(ctx, 6, h - 4, w - 12, 4, 'rgba(0,0,0,0.22)');
-
-  // main wall
-  r(ctx, 10, 22, w - 20, h - 26, STONE);
-  for (let y = 22; y < h - 4; y += 8) {
-    r(ctx, 10, y, w - 20, 1, STONE_D);
-    for (let x = 10; x < w - 10; x += 11) {
-      r(ctx, x + (Math.floor(y / 8) % 2) * 5, y, 1, 8, STONE_D);
-    }
-  }
-
-  // corner towers
-  for (const cx of [0, w - 14]) {
-    r(ctx, cx, 16, 14, h - 20, STONE_L);
-    for (let y = 16; y < h - 4; y += 8) { r(ctx, cx, y, 14, 1, STONE_D); }
-    for (const bx of [cx, cx + 5, cx + 10]) { r(ctx, bx, 12, 4, 5, STONE_L); }
-  }
-
-  // roof (triangle approximated with rects)
   const halfW = Math.floor(w / 2);
-  for (let i = 0; i < 20; i += 1) {
-    const rowW = Math.max(2, Math.round((i / 20) * (w - 20)));
-    const rx = halfW - Math.floor(rowW / 2);
-    r(ctx, rx, 2 + i, rowW, 1, ROOF);
-    // lighter left half
-    r(ctx, rx, 2 + i, Math.floor(rowW / 2), 1, ROOFL);
+  const TW = 14;   // corner-turret width
+  const TY = 22;   // corner-turret top y
+
+  // drop shadow
+  r(ctx, 8, h - 4, w - 16, 4, 'rgba(0,0,0,0.22)');
+
+  // ── main building wall ────────────────────────────────────────────────────
+  r(ctx, TW, 26, w - TW * 2, h - 26, STONE);
+  for (let y = 26; y < h; y += 8) {
+    r(ctx, TW, y, w - TW * 2, 1, STONE_D);
+    const off = (Math.floor((y - 26) / 8) % 2 === 0) ? 0 : 5;
+    for (let x = TW + off; x < w - TW; x += 12) { r(ctx, x, y, 1, 8, STONE_D); }
   }
-  r(ctx, halfW - 1, 2, 2, 20, ROOFD); // ridge
 
-  // flag
-  r(ctx, halfW - 1, 0, 2, 10, WOOD);
-  r(ctx, halfW + 1, 0, 8, 5, ROOFL);
+  // ── corner turrets ────────────────────────────────────────────────────────
+  for (const cx of [0, w - TW]) {
+    // turret body (slightly lighter stone for contrast)
+    r(ctx, cx, TY, TW, h - TY, STONE_L);
+    // horizontal mortar lines
+    for (let y = TY; y < h; y += 8) { r(ctx, cx, y, TW, 1, STONE_D); }
+    // centre vertical divider
+    r(ctx, cx + Math.floor(TW / 2), TY, 1, h - TY, STONE_D);
+    // merlons (3 per turret)
+    for (const bx of [cx, cx + 5, cx + 10]) { r(ctx, bx, TY - 7, 4, 7, STONE_L); }
+    // dark crenels between merlons
+    for (const gx of [cx + 4, cx + 9]) { r(ctx, gx, TY - 7, 1, 6, '#1a1410'); }
+    // turret-top border
+    r(ctx, cx, TY, TW, 1, STONE_D);
+  }
 
-  // gate arch (rect approximation)
+  // ── roof (triangle built from horizontal rows) ────────────────────────────
+  for (let i = 0; i < 22; i++) {
+    const rowW = Math.max(2, Math.round((i / 22) * (w - 18)));
+    const rx = halfW - Math.floor(rowW / 2);
+    r(ctx, rx, 4 + i, rowW, 1, ROOF);
+    r(ctx, rx, 4 + i, Math.floor(rowW / 2), 1, ROOFL);  // lighter left face
+  }
+  r(ctx, halfW - 1, 4, 2, 22, ROOFD);                   // ridge
+
+  // ── flag ──────────────────────────────────────────────────────────────────
+  r(ctx, halfW - 1, 0, 2, 10, WOOD);                    // pole
+  r(ctx, halfW + 1, 0, 8,  5, ROOFL);                   // banner
+
+  // ── gate arch ─────────────────────────────────────────────────────────────
   r(ctx, halfW - 8, h - 20, 16, 20, '#1a1410');
-  r(ctx, halfW - 7, h - 26, 14, 6, '#1a1410');
+  r(ctx, halfW - 7, h - 26, 14,  6, '#1a1410');
 
-  // windows
-  for (const wx of [16, w - 24]) {
-    r(ctx, wx, 32, 8, 10, '#1a2244');
-    r(ctx, wx + 1, 33, 6, 8, team === 'blue' ? 'rgba(100,180,255,0.5)' : 'rgba(255,100,100,0.5)');
+  // ── windows ───────────────────────────────────────────────────────────────
+  const winGlow = team === 'blue' ? 'rgba(100,180,255,0.5)' : 'rgba(255,100,100,0.5)';
+  for (const wx of [TW + 3, w - TW - 11]) {
+    r(ctx, wx,     32, 8, 10, '#1a1410');
+    r(ctx, wx + 1, 33, 6,  8, winGlow);
   }
 }
 
@@ -298,8 +323,8 @@ export function createSpriteRegistry(config) {
     hero:       { image: makeCanvas(32, 32, (ctx) => drawHero(ctx)) },
     'minion-blue': { image: makeCanvas(24, 24, (ctx) => drawMinion(ctx, 'blue')) },
     'minion-red':  { image: makeCanvas(24, 24, (ctx) => drawMinion(ctx, 'red')) },
-    'tower-blue':  { image: makeCanvas(40, 40, (ctx) => drawTower(ctx, 'blue')) },
-    'tower-red':   { image: makeCanvas(40, 40, (ctx) => drawTower(ctx, 'red')) },
+    'tower-blue':  { image: makeCanvas(48, 48, (ctx) => drawTower(ctx, 'blue')) },
+    'tower-red':   { image: makeCanvas(48, 48, (ctx) => drawTower(ctx, 'red')) },
     'base-blue':   { image: makeCanvas(bw, bh, (ctx) => drawBase(ctx, 'blue', bw, bh)) },
     'base-red':    { image: makeCanvas(bw, bh, (ctx) => drawBase(ctx, 'red', bw, bh)) },
     'tile-grass':  { image: makeCanvas(32, 32, (ctx) => drawGrassTile(ctx)) },

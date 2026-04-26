@@ -98,8 +98,8 @@ export const CONFIG = {
   },
   tower: {
     renderType: 'tower',
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     health: 420,
     attackRange: 180,
     attackDamage: 80,
