@@ -9,10 +9,10 @@ export function createSpawnSystem(waveConfig) {
     spawnLineSpacingX,
   } = waveConfig;
 
-  let elapsedMs = 0;
+  let elapsedMs = spawnIntervalMs;
   let waveCount = 0;
   function reset() {
-    elapsedMs = 0;
+    elapsedMs = spawnIntervalMs;
     waveCount = 0;
   }
 
