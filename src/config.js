@@ -53,7 +53,7 @@ export const CONFIG = {
     attackDamage: 18,
     attackRange: 60,
     attackCooldownMs: 700,
-    respawnDelayMs: 3000,
+    respawnDelayMs: 10000,
     spawnLaneOffsetX: 60,
     color: '#4aa8ff',
   },
