@@ -146,6 +146,162 @@ export class Renderer {
     this.ctx.globalAlpha = 1;
   }
 
+  // ── targeting overlays ────────────────────────────────────────────────────────
+
+  // Draw a stroked circle at a world position (no fill or with optional fill alpha).
+  _drawWorldCircle(worldX, worldY, radius, color, strokeAlpha = 0.8, fillAlpha = 0.08, lineWidth = 1.5) {
+    if (radius <= 0) { return; }
+    const { x, y } = this.camera.worldToScreen(worldX, worldY);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(Math.round(x), Math.round(y), radius, 0, Math.PI * 2);
+    if (fillAlpha > 0) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = fillAlpha;
+      ctx.fill();
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.globalAlpha = strokeAlpha;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Draw a line between two world positions.
+  _drawWorldLine(x1, y1, x2, y2, color, alpha = 0.7, lineWidth = 1.5) {
+    const s1 = this.camera.worldToScreen(x1, y1);
+    const s2 = this.camera.worldToScreen(x2, y2);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.globalAlpha = alpha;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(Math.round(s1.x), Math.round(s1.y));
+    ctx.lineTo(Math.round(s2.x), Math.round(s2.y));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  // Draw a small destination diamond/cross marker at a world position.
+  _drawDestinationMarker(worldX, worldY, color, alpha = 0.85) {
+    const { x, y } = this.camera.worldToScreen(worldX, worldY);
+    const sx = Math.round(x);
+    const sy = Math.round(y);
+    const SIZE = 6;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx - SIZE, sy);
+    ctx.lineTo(sx, sy - SIZE);
+    ctx.lineTo(sx + SIZE, sy);
+    ctx.lineTo(sx, sy + SIZE);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw all targeting indicators based on the current targeting state.
+  // `targetingState`  – TARGETING_STATE value string.
+  // `abilities`       – hero.abilities array.
+  // `mouseWorldX/Y`   – current mouse position in world coordinates.
+  drawTargetingOverlay(hero, targetingState, abilities, mouseWorldX, mouseWorldY) {
+    if (!hero || !hero.alive) { return; }
+
+    const TARGETING_STATE = {
+      NONE: 'NONE',
+      Q_TARGETING: 'Q_TARGETING',
+      W_TARGETING: 'W_TARGETING',
+      E_TARGETING: 'E_TARGETING',
+      R_TARGETING: 'R_TARGETING',
+    };
+
+    if (targetingState === TARGETING_STATE.NONE) { return; }
+
+    const ctx = this.ctx;
+    ctx.save();
+
+    if (targetingState === TARGETING_STATE.Q_TARGETING) {
+      const ability = abilities?.find((a) => a.key === 'Q');
+      const castRange = ability?.castRange ?? 80;
+      const hitRadius = ability?.hitRadius ?? 35;
+
+      // Cast-range circle around hero.
+      this._drawWorldCircle(hero.x, hero.y, castRange, '#ffffff', 0.5, 0.05);
+
+      // Direction from hero to mouse.
+      const dx = mouseWorldX - hero.x;
+      const dy = mouseWorldY - hero.y;
+      const mag = Math.hypot(dx, dy);
+      if (mag > 0.001) {
+        const dirX = dx / mag;
+        const dirY = dy / mag;
+        const hitX = hero.x + dirX * castRange;
+        const hitY = hero.y + dirY * castRange;
+        // Hit-area circle at slash endpoint.
+        this._drawWorldCircle(hitX, hitY, hitRadius, '#ffee55', 0.7, 0.12);
+      }
+    } else if (targetingState === TARGETING_STATE.W_TARGETING) {
+      const ability = abilities?.find((a) => a.key === 'W');
+      const maxDist = ability?.distance ?? 150;
+
+      // Dash-range circle around hero.
+      this._drawWorldCircle(hero.x, hero.y, maxDist, '#aaddff', 0.5, 0.05);
+
+      // Clamp destination to max dash distance.
+      const dx = mouseWorldX - hero.x;
+      const dy = mouseWorldY - hero.y;
+      const dist = Math.hypot(dx, dy);
+      const t = Math.min(dist, maxDist) / (dist || 1);
+      const destX = hero.x + dx * t;
+      const destY = hero.y + dy * t;
+
+      this._drawWorldLine(hero.x, hero.y, destX, destY, '#aaddff', 0.55);
+      this._drawDestinationMarker(destX, destY, '#aaddff');
+    } else if (targetingState === TARGETING_STATE.E_TARGETING) {
+      const ability = abilities?.find((a) => a.key === 'E');
+      const castRange = ability?.castRange ?? 400;
+
+      // Projectile path line from hero toward mouse (clamped to cast range).
+      const dx = mouseWorldX - hero.x;
+      const dy = mouseWorldY - hero.y;
+      const dist = Math.hypot(dx, dy);
+      const t = Math.min(dist, castRange) / (dist || 1);
+      const endX = hero.x + dx * t;
+      const endY = hero.y + dy * t;
+
+      this._drawWorldLine(hero.x, hero.y, endX, endY, '#44ff88', 0.6, 2);
+      // Small impact circle at the endpoint.
+      this._drawWorldCircle(endX, endY, 12, '#44ff88', 0.7, 0.15, 1.5);
+    } else if (targetingState === TARGETING_STATE.R_TARGETING) {
+      const ability = abilities?.find((a) => a.key === 'R');
+      const castRange = ability?.castRange ?? 200;
+      const aoeRadius = ability?.aoeRadius ?? 80;
+
+      // Cast-range circle around hero.
+      this._drawWorldCircle(hero.x, hero.y, castRange, '#ff44ff', 0.4, 0.04);
+
+      // Determine whether mouse is in cast range for colour feedback.
+      const dx = mouseWorldX - hero.x;
+      const dy = mouseWorldY - hero.y;
+      const dist = Math.hypot(dx, dy);
+      const inRange = dist <= castRange;
+      const aoeColor = inRange ? '#ff44ff' : '#ff4444';
+
+      // AoE circle at mouse position (or clamped to range boundary if out).
+      this._drawWorldCircle(mouseWorldX, mouseWorldY, aoeRadius, aoeColor, 0.7, 0.12);
+    }
+
+    ctx.restore();
+  }
+
   // ── entities ─────────────────────────────────────────────────────────────────
 
   resolveSpriteId(entity) {
@@ -692,11 +848,12 @@ export class Renderer {
 
   // ── Ability HUD ───────────────────────────────────────────────────────────────
 
-  // Draw the Q / F / E / R ability bar centred at the bottom of the screen.
+  // Draw the Q / W / E / R ability bar centred at the bottom of the screen.
   // When icon images are provided, each slot shows the icon with a cooldown
   // overlay; otherwise it falls back to a text-only layout.
-  // icons: { Q: HTMLImageElement|null, F, E, R } from assetLoader (optional).
-  drawAbilityHUD(hero, icons = {}) {
+  // icons: { Q: HTMLImageElement|null, W, E, R } from assetLoader (optional).
+  // selectedKey: active targeting mode key ('Q'/'W'/'E'/'R') or null.
+  drawAbilityHUD(hero, icons = {}, selectedKey = null) {
     if (!hero || !hero.abilities) { return; }
 
     const abilities = hero.abilities;
@@ -718,10 +875,11 @@ export class Renderer {
       const slotX = startX + i * (SLOT_W + GAP);
       const slotY = startY;
       const isReady = ability.currentCooldown <= 0;
+      const isSelected = ability.key === selectedKey;
       const icon = icons?.[ability.key] ?? null;
 
       // ── Background ────────────────────────────────────────────────────────
-      ctx.fillStyle = 'rgba(8, 12, 24, 0.82)';
+      ctx.fillStyle = isSelected ? 'rgba(255, 220, 60, 0.22)' : 'rgba(8, 12, 24, 0.82)';
       ctx.fillRect(slotX, slotY, SLOT_W, SLOT_H);
 
       if (icon) {
@@ -760,16 +918,21 @@ export class Renderer {
         ctx.fillText(ability.name, slotX + 6, slotY + 34);
       }
 
-      // ── Border (green = ready, grey = on cooldown) ────────────────────────
-      ctx.strokeStyle = isReady ? '#44ff88' : '#445566';
-      ctx.lineWidth = 2;
+      // ── Border: gold when selected, green when ready, grey on cooldown ────
+      if (isSelected) {
+        ctx.strokeStyle = '#ffdc3c';
+        ctx.lineWidth = 3;
+      } else {
+        ctx.strokeStyle = isReady ? '#44ff88' : '#445566';
+        ctx.lineWidth = 2;
+      }
       ctx.strokeRect(slotX + 1, slotY + 1, SLOT_W - 2, SLOT_H - 2);
 
       // ── Cooldown status text (bottom row) ─────────────────────────────────
       if (isReady) {
-        ctx.fillStyle = '#44ff88';
+        ctx.fillStyle = isSelected ? '#ffdc3c' : '#44ff88';
         ctx.font = '9px monospace';
-        ctx.fillText('Ready', slotX + 6, slotY + SLOT_H - 6);
+        ctx.fillText(isSelected ? 'ACTIVE' : 'Ready', slotX + 6, slotY + SLOT_H - 6);
       } else {
         ctx.fillStyle = '#ff9966';
         ctx.font = '9px monospace';
