@@ -7,17 +7,21 @@ Simple 2D top-down pixel-style MOBA prototype scaffold built with:
 
 ## Setup
 
-### Option 1: Open directly
-Open `/home/runner/work/Pixel-league/Pixel-league/index.html` in a browser.
-
-### Option 2: Run with a local server
-From `/home/runner/work/Pixel-league/Pixel-league`:
+### Local development
 
 ```bash
-python3 -m http.server 8000
+npm install
+npm run dev
 ```
 
-Then open: `http://localhost:8000`
+Then open: `http://localhost:5173`
+
+### Build for production
+
+```bash
+npm run build
+npm run preview   # preview the built output locally
+```
 
 ## Controls
 
@@ -129,17 +133,18 @@ aoeRadius: 80,   // radius of the explosion
 ## Project structure
 
 ```text
-/assets
-  /abilities
-    /q_slash/       – Q Slash animation frames (arc, spark, ring)
-    /f_dash/        – F Dash animation frames (start, trail, end)
-    /e_blast/       – E Energy Blast frames (charge, projectile, impact)
-    /r_burst/       – R Energy Burst frames (charge, explosion, aftershock)
-  /ui
-    ui_q_icon.png   – HUD icon for Q ability
-    ui_f_icon.png   – HUD icon for F ability
-    ui_e_icon.png   – HUD icon for E ability
-    ui_r_icon.png   – HUD icon for R ability
+/public
+  /assets
+    /abilities
+      /q_slash/       – Q Slash animation frames (arc, spark, ring)
+      /f_dash/        – F Dash animation frames (start, trail, end)
+      /e_blast/       – E Energy Blast frames (charge, projectile, impact)
+      /r_burst/       – R Energy Burst frames (charge, explosion, aftershock)
+    /ui
+      ui_q_icon.png   – HUD icon for Q ability
+      ui_f_icon.png   – HUD icon for F ability
+      ui_e_icon.png   – HUD icon for E ability
+      ui_r_icon.png   – HUD icon for R ability
 /src
   main.js
   game.js
@@ -179,8 +184,8 @@ aoeRadius: 80,   // radius of the explosion
 ### Where they are stored
 
 ```
-assets/abilities/<ability_folder>/<animKey>_<frameIndex>.png
-assets/ui/ui_<key>_icon.png
+public/assets/abilities/<ability_folder>/<animKey>_<frameIndex>.png
+public/assets/ui/ui_<key>_icon.png
 ```
 
 ### Animation naming convention
@@ -203,7 +208,7 @@ Each animation is a numbered PNG sequence starting at `_0`:
 
 ### How to add new ability effects
 
-1. **Create the PNG frames** — name them `<animKey>_0.png`, `<animKey>_1.png`, … and place them in `assets/abilities/<folder>/`.
+1. **Create the PNG frames** — name them `<animKey>_0.png`, `<animKey>_1.png`, … and place them in `public/assets/abilities/<folder>/`.
 
 2. **Register the animation** in `src/assets/assetLoader.js` by adding a row to `frameManifest`:
    ```js
@@ -222,7 +227,7 @@ Each animation is a numbered PNG sequence starting at `_0`:
    ```
    If the PNG files are missing the renderer falls back to a coloured placeholder rectangle — no crash.
 
-4. **Add a HUD icon** (optional): place `ui_<key>_icon.png` in `assets/ui/` and add its entry to `iconManifest` in `assetLoader.js`.
+4. **Add a HUD icon** (optional): place `ui_<key>_icon.png` in `public/assets/ui/` and add its entry to `iconManifest` in `assetLoader.js`.
 
 ---
 
@@ -243,7 +248,7 @@ python3 tools/generate_combat_vfx.py
 ### Where VFX assets live
 
 ```
-assets/vfx/
+public/assets/vfx/
   tower_blast/
     charge/      – tower_charge_01..04.png   (48×48, cyan orb forming)
     projectile/  – tower_projectile_01..04.png (48×48, bolt facing right)
@@ -267,6 +272,8 @@ Register new sequences in `src/assets/assetLoader.js` under `vfxManifest`:
 ```js
 ['my_vfx_key', 'assets/vfx/<folder>', 'my_vfx_key', frameCount],
 ```
+
+> Place the PNG files in `public/assets/vfx/<folder>/`.
 
 Load them in game code via `this.assets?.vfxFrames?.my_vfx_key`.
 
@@ -304,23 +311,36 @@ The game supports 2-player realtime multiplayer using **Supabase Realtime** for 
 
 > ⚠️ Only use the `anon` / `public` key.  Never paste the `service_role` key into client code.
 
-### 2. Add Your Credentials
+### 2. Set Environment Variables
 
-Open `src/config/supabaseConfig.js` and fill in the two values:
+**Local development** — copy `.env.example` to `.env` and fill in your values:
 
-```js
-export const SUPABASE_URL = 'https://your-project.supabase.co';
-export const SUPABASE_ANON_KEY = 'your-anon-key-here';
+```bash
+cp .env.example .env
 ```
+
+```ini
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key-here
+```
+
+`.env` is gitignored and never committed.
+
+**Vercel** — add the same variables in the Vercel dashboard:
+
+1. Open your project in [vercel.com](https://vercel.com).
+2. Go to **Settings → Environment Variables**.
+3. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for **Production** (and optionally Preview).
+4. Redeploy so the new env vars take effect.
 
 ### 3. Deploy to Vercel
 
-1. Push your repository to GitHub.
+1. Push this repository to GitHub.
 2. Import the repo in [Vercel](https://vercel.com).
-3. No build command needed — set the output directory to `.` (repository root).
-4. Deploy.
+3. Vercel auto-detects the `vercel.json` — it runs `npm run build` and serves `dist/`.
+4. Add your environment variables (step 2 above) and deploy.
 
-The `Create Room` and `Join Room` buttons will be enabled automatically once the credentials are set.
+The **Create Room** and **Join Room** buttons are enabled automatically once both variables are present.  Without them, multiplayer buttons show *"Multiplayer is not configured yet"* and single-player still works normally.
 
 ### Multiplayer Controls
 

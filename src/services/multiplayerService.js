@@ -76,7 +76,7 @@ export class MultiplayerService {
   // ── Room lifecycle ────────────────────────────────────────────────────────
 
   async createRoom() {
-    const supabase = await getSupabaseClient();
+    const supabase = getSupabaseClient();
     if (!supabase) throw new Error('Supabase is not configured.');
 
     this.roomCode = generateRoomCode();
@@ -87,7 +87,7 @@ export class MultiplayerService {
   }
 
   async joinRoom(roomCode) {
-    const supabase = await getSupabaseClient();
+    const supabase = getSupabaseClient();
     if (!supabase) throw new Error('Supabase is not configured.');
 
     const code = roomCode.trim().toUpperCase();

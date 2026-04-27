@@ -1,26 +1,27 @@
 // Supabase browser client factory.
-// Imports Supabase JS v2 from the jsDelivr ESM CDN — no build step required.
-// Returns null when credentials are not configured so the rest of the game can
-// degrade gracefully (single-player still works).
+// Reads VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from Vite environment
+// variables (set in .env locally or in the Vercel project settings).
+// Returns null when credentials are not configured so the rest of the game
+// degrades gracefully — single-player still works without Supabase.
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config/supabaseConfig.js';
+import { createClient } from '@supabase/supabase-js';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
 export function isSupabaseConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-let _clientPromise = null;
+let _client = null;
 
-// Returns a Promise that resolves to the Supabase client, or null when
-// credentials are missing.  The client is created once and reused.
-export async function getSupabaseClient() {
+// Returns the Supabase client, or null when credentials are missing.
+// The client is created once and reused.
+export function getSupabaseClient() {
   if (!isSupabaseConfigured()) return null;
-
-  if (!_clientPromise) {
-    _clientPromise = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm').then(
-      ({ createClient }) => createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    );
+  if (!_client) {
+    _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
-
-  return _clientPromise;
+  return _client;
 }
+
