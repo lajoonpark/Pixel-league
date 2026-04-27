@@ -18,6 +18,7 @@ import { VfxSystem } from './systems/vfxSystem.js';
 import { castAbility, updateAbilityCooldowns } from './systems/abilitySystem.js';
 import { updateProjectiles } from './systems/projectileSystem.js';
 import { TargetingSystem, TARGETING_STATE } from './systems/targetingSystem.js';
+import { MobileControls } from './systems/mobileControlsSystem.js';
 
 export class Game {
   constructor(canvas, assets = { frames: {}, icons: {} }) {
@@ -47,6 +48,9 @@ export class Game {
     this.resultMessage = '';
     // Click marker for visual movement feedback { x, y, spawnMs } or null.
     this.clickMarker = null;
+
+    // Mobile touch controls (attached on play start if device supports touch).
+    this.mobileControls = new MobileControls(canvas);
 
     this.menu = new Menu(canvas, () => this._startGame());
   }
@@ -101,6 +105,9 @@ export class Game {
     this.setupWorld();
     this.state = GAME_STATES.playing;
     this.input.attach(this.canvas);
+    if (this.mobileControls.isMobile) {
+      this.mobileControls.attach();
+    }
     this.camera.follow(this.hero);
   }
 
@@ -122,6 +129,7 @@ export class Game {
     this.targetingSystem.cancel();
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     this.wasEscapePressed = false;
+    this.mobileControls.reset();
     this.camera.follow(this.hero);
   }
 
@@ -209,6 +217,62 @@ export class Game {
         this.targetingSystem.selectAbility(key);
       }
       this.wasAbilityPressed[key] = pressed;
+    }
+
+    // ── Mobile touch controls ─────────────────────────────────────────────────
+    if (this.mobileControls.isMobile && this.hero.alive) {
+      // Cancel via cancel-zone gesture.
+      if (this.mobileControls.cancelRequested) {
+        this.targetingSystem.cancel();
+      }
+
+      // Ability button pressed: enter targeting mode for that ability.
+      const activatedKey = this.mobileControls.abilityJustActivated;
+      if (activatedKey) {
+        const ability = this.hero.abilities?.find((a) => a.key === activatedKey);
+        if (ability && ability.currentCooldown <= 0) {
+          this.targetingSystem.selectAbility(activatedKey);
+        }
+      }
+
+      // Ability button released: cast at the aimed world position.
+      const releasedKey = this.mobileControls.abilityJustReleased;
+      if (releasedKey) {
+        const selectedKey = this.targetingSystem.getSelectedKey();
+        if (selectedKey === releasedKey) {
+          const ap = this.mobileControls.aimPosition;
+          let targetPoint = null;
+          if (ap) {
+            targetPoint = { x: ap.x + this.camera.x, y: ap.y + this.camera.y };
+          }
+          const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
+          castAbility(this.hero, releasedKey, this.entities, this.projectiles, vfxCtx, targetPoint);
+          this.targetingSystem.cancel();
+        }
+      }
+
+      // Attack button tapped: find nearest enemy within a comfortable radius.
+      // The search extends beyond the hero's attack range so the hero will walk
+      // to nearby enemies automatically (same behaviour as desktop click-to-attack).
+      if (this.mobileControls.attackRequested) {
+        const MOBILE_ATTACK_SEARCH_EXTENSION = 120; // world-px buffer added to attack range
+        const MOBILE_ATK_SEARCH = this.hero.attackRange + MOBILE_ATTACK_SEARCH_EXTENSION;
+        const enemy = findEnemyNearPoint(
+          this.entities, this.hero.x, this.hero.y, MOBILE_ATK_SEARCH, this.hero.team
+        );
+        if (enemy) {
+          const dx = enemy.x - this.hero.x;
+          const dy = enemy.y - this.hero.y;
+          const distSq = dx * dx + dy * dy;
+          const rangeSq = this.hero.attackRange * this.hero.attackRange;
+          if (distSq <= rangeSq) {
+            this._triggerBasicAttack(nowMs);
+          } else {
+            this.hero.targetPosition = { x: enemy.x, y: enemy.y };
+            this.hero.pendingAttackTarget = enemy;
+          }
+        }
+      }
     }
 
     // ── Right click: cancel targeting, then move ──────────────────────────────
@@ -402,6 +466,20 @@ export class Game {
       return;
     }
 
+    // ── Mobile joystick movement takes priority over click-to-move ────────────
+    const joystickDir = this.mobileControls?.joystickDir;
+    if (joystickDir) {
+      const speed = this.hero.moveSpeed ?? CONFIG.hero.moveSpeed;
+      this.hero.vx = joystickDir.x * speed;
+      this.hero.vy = joystickDir.y * speed;
+      // Keep lastMoveDir updated so abilities aim in the joystick direction.
+      this.hero.lastMoveDir = { x: joystickDir.x, y: joystickDir.y };
+      // Clear any pending click-to-move target so they don't conflict.
+      this.hero.targetPosition = null;
+      return;
+    }
+
+    // ── Desktop click-to-move ─────────────────────────────────────────────────
     const target = this.hero.targetPosition;
     if (!target) {
       this.hero.vx = 0;
@@ -581,15 +659,25 @@ export class Game {
     this.renderer.drawProjectiles(this.projectiles);
 
     // Draw targeting range/preview indicators above the world layer.
+    // On mobile, use the current aim touch position instead of the mouse.
     if (this.hero.alive) {
-      const mouseWorldX = this.input.mouseX + this.camera.x;
-      const mouseWorldY = this.input.mouseY + this.camera.y;
+      let aimWorldX, aimWorldY;
+      const mobileAim = this.mobileControls.isMobile
+        ? this.mobileControls.aimPosition
+        : null;
+      if (mobileAim) {
+        aimWorldX = mobileAim.x + this.camera.x;
+        aimWorldY = mobileAim.y + this.camera.y;
+      } else {
+        aimWorldX = this.input.mouseX + this.camera.x;
+        aimWorldY = this.input.mouseY + this.camera.y;
+      }
       this.renderer.drawTargetingOverlay(
         this.hero,
         this.targetingSystem.state,
         this.hero.abilities,
-        mouseWorldX,
-        mouseWorldY
+        aimWorldX,
+        aimWorldY
       );
     }
 
@@ -608,40 +696,57 @@ export class Game {
       }
     }
 
-    // ── HUD text ──────────────────────────────────────────────────────────────
+    // ── HUD text (desktop-style controls, hidden on touch devices) ───────────
     const selectedKey = this.targetingSystem.getSelectedKey();
-    this.renderer.drawText('Move: Right Click', 12, 24);
-    this.renderer.drawText('Attack: Left Click', 12, 40);
-    if (selectedKey) {
+    if (!this.mobileControls.isMobile) {
+      this.renderer.drawText('Move: Right Click', 12, 24);
+      this.renderer.drawText('Attack: Left Click', 12, 40);
+      if (selectedKey) {
+        this.renderer.drawText(
+          `Targeting: ${selectedKey} — Left Click to cast, Right Click / Esc to cancel`,
+          12,
+          56,
+          { font: CONFIG.ui.font, color: '#ffdc3c' }
+        );
+      } else {
+        this.renderer.drawText('Q / W / E / R = Select ability', 12, 56);
+      }
+      this.renderer.drawText('Restart: R (after match ends)', 12, 72);
+      this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
       this.renderer.drawText(
-        `Targeting: ${selectedKey} — Left Click to cast, Right Click / Esc to cancel`,
+        `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
         12,
-        56,
-        { font: CONFIG.ui.font, color: '#ffdc3c' }
+        104,
+        { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
       );
+      if (!this.hero.alive) {
+        const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
+        this.renderer.drawText(
+          `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
+          12,
+          120,
+          { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
+        );
+      }
     } else {
-      this.renderer.drawText('Q / W / E / R = Select ability', 12, 56);
-    }
-    this.renderer.drawText('Restart: R (after match ends)', 12, 72);
-    this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
-    this.renderer.drawText(
-      `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
-      12,
-      104,
-      { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
-    );
-    if (!this.hero.alive) {
-      const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
-      this.renderer.drawText(
-        `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
-        12,
-        120,
-        { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
-      );
+      // On mobile show a minimal respawn timer if the hero is dead.
+      if (!this.hero.alive) {
+        const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
+        this.renderer.drawText(
+          `Respawning in ${(remainingRespawnMs / 1000).toFixed(1)}s`,
+          this.canvas.width / 2 - 80,
+          100,
+          { font: CONFIG.ui.font, color: CONFIG.ui.warningColor }
+        );
+      }
     }
 
-    // Ability HUD drawn last so it sits on top of everything.
-    this.renderer.drawAbilityHUD(this.hero, this.assets?.icons, selectedKey);
+    // Ability HUD: desktop slot-bar on non-mobile; mobile button overlay on touch devices.
+    if (this.mobileControls.isMobile) {
+      this.renderer.drawMobileHUD(this.mobileControls, this.hero, selectedKey);
+    } else {
+      this.renderer.drawAbilityHUD(this.hero, this.assets?.icons, selectedKey);
+    }
 
     if (this.state === GAME_STATES.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');

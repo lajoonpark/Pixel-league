@@ -21,6 +21,8 @@ Then open: `http://localhost:8000`
 
 ## Controls
 
+### Desktop Controls
+
 | Key / Input | Action |
 |-------------|--------|
 | Right Click | Move hero / cancel ability targeting |
@@ -32,7 +34,21 @@ Then open: `http://localhost:8000`
 | Esc | Cancel ability targeting |
 | R *(after game ends)* | Restart match |
 
-### How targeting modes work
+### Mobile Controls (landscape recommended)
+
+| Touch gesture | Action |
+|--------------|--------|
+| Left joystick | Move hero continuously in that direction |
+| ATK button | Basic attack nearest enemy |
+| Hold Q/W/E/R button | Aim that ability (shows range/direction indicator) |
+| Drag while holding ability button | Adjust aim |
+| Release ability button | Cast ability at aimed position |
+| Drag to **CANCEL** zone (top-right) while aiming | Cancel cast |
+
+> **Tip:** Landscape orientation is recommended for the best experience.
+> Desktop keyboard/mouse controls still work even when mobile touch controls are active.
+
+### How targeting modes work (desktop)
 
 Pressing **Q / W / E / R** enters that ability's *targeting mode*:
 
@@ -62,7 +78,32 @@ When no ability is selected, left-clicking near an enemy triggers a basic attack
 | E Energy Blast | Dashed line from hero toward mouse (capped at cast range) + small impact circle |
 | R Energy Burst | Cast range circle around hero + AoE circle at mouse (turns red when out of range) |
 
-### Tuning cast ranges and AoE sizes
+### Tuning mobile button positions and sizes
+
+Mobile button layout is defined in `src/systems/mobileControlsSystem.js` under `MOBILE_LAYOUT`.
+All coordinates are in the game's logical canvas space (960 × 540 pixels).
+
+```js
+// Joystick (bottom-left)
+joystick: { cx: 130, cy: 440, baseRadius: 65, thumbRadius: 26, touchRadius: 110 }
+
+// Basic attack button (bottom-right)
+attack: { cx: 860, cy: 458, radius: 42 }
+
+// Ability buttons (surrounding the attack button)
+{ key: 'Q', cx: 772, cy: 408, radius: 35 }
+{ key: 'W', cx: 848, cy: 385, radius: 35 }
+{ key: 'E', cx: 772, cy: 464, radius: 35 }
+{ key: 'R', cx: 898, cy: 400, radius: 40 }  // R is intentionally larger
+
+// Cancel zone (top-right, shown only while aiming)
+cancel: { cx: 878, cy: 78, radius: 52 }
+```
+
+The corresponding visual positions in `renderer.js` (`drawMobileHUD`) mirror these
+constants.  Update both files if you change the layout.
+
+
 
 All ability parameters live in `src/systems/abilitySystem.js` inside `createHeroAbilities()`:
 
@@ -122,6 +163,7 @@ aoeRadius: 80,   // radius of the explosion
     effectSystem.js   – Lightweight programmatic effect pool (slash arc, hit spark)
     vfxSystem.js      – Sprite-frame one-shot VFX pool
     projectileSystem.js
+    mobileControlsSystem.js  – Virtual joystick, ability buttons, attack button for touch devices
   /world
     map.js
     lane.js

@@ -1,4 +1,6 @@
 // Renderer wraps low-level canvas drawing operations.
+import { MOBILE_LAYOUT } from './systems/mobileControlsSystem.js';
+
 export class Renderer {
   constructor(canvas, camera, config) {
     this.canvas = canvas;
@@ -938,6 +940,156 @@ export class Renderer {
         ctx.font = '9px monospace';
         ctx.fillText(`${ability.currentCooldown.toFixed(1)}s`, slotX + 6, slotY + SLOT_H - 6);
       }
+    }
+
+    ctx.restore();
+  }
+
+  // ── Mobile HUD ────────────────────────────────────────────────────────────────
+
+  // Draw all mobile touch controls: joystick, ability buttons, attack button,
+  // and cancel zone.  All positions are in logical canvas coordinates.
+  // mobileControls – MobileControls instance (provides live state for rendering).
+  // hero           – hero entity (for ability cooldown information).
+  // selectedKey    – active targeting key ('Q'/'W'/'E'/'R') or null.
+  drawMobileHUD(mobileControls, hero, selectedKey) {
+    const ctx = this.ctx;
+    // Use the single-source layout from mobileControlsSystem.js.
+    const J = MOBILE_LAYOUT.joystick;
+    const ATK = MOBILE_LAYOUT.attack;
+    const ABILITIES = MOBILE_LAYOUT.abilities;
+    const CANCEL = MOBILE_LAYOUT.cancel;
+
+    const abilities = hero?.abilities ?? [];
+    const isAiming = mobileControls.activeMobileAbility !== null;
+
+    ctx.save();
+
+    // ── Cancel zone (shown when an ability is being aimed) ─────────────────────
+    if (isAiming) {
+      ctx.beginPath();
+      ctx.arc(CANCEL.cx, CANCEL.cy, CANCEL.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(200, 50, 50, 0.25)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.75)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ff6666';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✕', CANCEL.cx, CANCEL.cy - 8);
+      ctx.font = '9px monospace';
+      ctx.fillText('CANCEL', CANCEL.cx, CANCEL.cy + 10);
+    }
+
+    // ── Joystick base ──────────────────────────────────────────────────────────
+    ctx.beginPath();
+    ctx.arc(J.cx, J.cy, J.baseRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(160, 200, 255, 0.10)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160, 200, 255, 0.40)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // ── Joystick thumb ────────────────────────────────────────────────────────
+    const thumb = mobileControls.joystickThumbPos;
+    ctx.beginPath();
+    ctx.arc(thumb.x, thumb.y, J.thumbRadius, 0, Math.PI * 2);
+    ctx.fillStyle = mobileControls.joystickDir
+      ? 'rgba(100, 180, 255, 0.65)'
+      : 'rgba(100, 180, 255, 0.30)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(160, 220, 255, 0.75)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // ── Helper: draw a circular button ────────────────────────────────────────
+    const drawCircleButton = (cx, cy, radius, label, bgColor, borderColor, cdFraction, isActive) => {
+      // Background
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fillStyle = bgColor;
+      ctx.fill();
+
+      // Cooldown arc overlay (drawn as a filled slice from the top, clockwise).
+      if (cdFraction > 0) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + Math.PI * 2 * cdFraction;
+        ctx.arc(cx, cy, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+        ctx.fill();
+      }
+
+      // Border
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = isActive ? '#ffdc3c' : borderColor;
+      ctx.lineWidth = isActive ? 3 : 2;
+      ctx.stroke();
+
+      // Label text
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (cdFraction > 0) {
+        // Cooldown countdown number
+        const ability = abilities.find((a) => a.key === label);
+        if (ability) {
+          ctx.fillStyle = '#ffaa66';
+          ctx.font = `bold ${Math.round(radius * 0.55)}px monospace`;
+          ctx.fillText(ability.currentCooldown.toFixed(1), cx, cy);
+        } else {
+          ctx.fillStyle = '#ffaa66';
+          ctx.font = `bold ${Math.round(radius * 0.55)}px monospace`;
+          ctx.fillText(label, cx, cy);
+        }
+      } else {
+        ctx.fillStyle = isActive ? '#ffdc3c' : '#e8f0ff';
+        ctx.font = `bold ${Math.round(radius * 0.62)}px monospace`;
+        ctx.fillText(label, cx, cy);
+      }
+    };
+
+    // ── Attack button ─────────────────────────────────────────────────────────
+    drawCircleButton(
+      ATK.cx, ATK.cy, ATK.radius,
+      'ATK',
+      'rgba(255, 160, 50, 0.28)',
+      'rgba(255, 180, 80, 0.75)',
+      0,   // attack has no cooldown display
+      false
+    );
+
+    // ── Ability buttons ───────────────────────────────────────────────────────
+    for (const btn of ABILITIES) {
+      const ability = abilities.find((a) => a.key === btn.key);
+      const cooldown = ability?.cooldown ?? 1;
+      const current = ability?.currentCooldown ?? 0;
+      const cdFraction = current > 0 ? current / cooldown : 0;
+      const isActive = selectedKey === btn.key;
+      const isHeld = mobileControls.activeMobileAbility === btn.key;
+
+      // R button gets a slightly different colour to emphasise it.
+      const bgColor = btn.key === 'R'
+        ? 'rgba(180, 60, 220, 0.28)'
+        : 'rgba(60, 120, 220, 0.28)';
+      const borderColor = cdFraction > 0
+        ? 'rgba(120, 120, 180, 0.55)'
+        : (btn.key === 'R' ? 'rgba(200, 100, 255, 0.80)' : 'rgba(100, 160, 255, 0.80)');
+
+      drawCircleButton(
+        btn.cx, btn.cy, btn.radius,
+        btn.key,
+        bgColor,
+        borderColor,
+        cdFraction,
+        isActive || isHeld
+      );
     }
 
     ctx.restore();
