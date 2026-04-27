@@ -578,6 +578,9 @@ export class Renderer {
 
   // Draw a single hero-fired projectile.  Uses looping sprite-frame animation
   // when the projectile carries animFrames; falls back to a filled rectangle.
+  // When projectile.rotation is set (radians) the sprite is rotated around its
+  // centre so directional sprites (e.g. tower bolt facing right) always point
+  // in the direction of travel.
   drawProjectile(projectile) {
     if (!projectile.alive) { return; }
     const { x, y } = this.camera.worldToScreen(projectile.x, projectile.y);
@@ -589,16 +592,21 @@ export class Renderer {
       const frame = projectile.animFrames[frameIdx];
 
       if (frame) {
-        this.ctx.save();
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.drawImage(
-          frame,
-          Math.round(x - projectile.width / 2),
-          Math.round(y - projectile.height / 2),
-          projectile.width,
-          projectile.height
-        );
-        this.ctx.restore();
+        const ctx = this.ctx;
+        const hw = projectile.width / 2;
+        const hh = projectile.height / 2;
+        const sx = Math.round(x);
+        const sy = Math.round(y);
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        if (typeof projectile.rotation === 'number' && projectile.rotation !== 0) {
+          ctx.translate(sx, sy);
+          ctx.rotate(projectile.rotation);
+          ctx.drawImage(frame, -hw, -hh, projectile.width, projectile.height);
+        } else {
+          ctx.drawImage(frame, sx - hw, sy - hh, projectile.width, projectile.height);
+        }
+        ctx.restore();
         return;
       }
     }
