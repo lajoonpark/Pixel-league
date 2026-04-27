@@ -14,6 +14,8 @@ import { collisionSystem } from './systems/collisionSystem.js';
 import { combatSystem } from './systems/combatSystem.js';
 import { healthSystem } from './systems/healthSystem.js';
 import { EffectSystem } from './systems/effectSystem.js';
+import { castAbility, updateAbilityCooldowns } from './systems/abilitySystem.js';
+import { updateProjectiles } from './systems/projectileSystem.js';
 
 export class Game {
   constructor(canvas) {
@@ -29,6 +31,11 @@ export class Game {
     this.fps = 0;
     this.waveCount = 0;
     this.wasAttackPressed = false;
+    // Tracks previous-frame pressed state for each ability key to enable
+    // fresh-press detection (cast fires once per key-down, not while held).
+    this.wasAbilityPressed = { Q: false, F: false, E: false, R: false };
+    // Live hero-fired projectiles (Power Shot).  Kept separate from entities.
+    this.projectiles = [];
     this.state = GAME_STATES.menu;
     this.resultMessage = '';
 
@@ -95,6 +102,7 @@ export class Game {
     this.spawnSystem.reset();
     this.waveCount = 0;
     this.effectSystem.effects = [];
+    this.projectiles = [];
     this.setupWorld();
     this.input.keys.clear();
     this.wasAttackPressed = false;
@@ -173,9 +181,31 @@ export class Game {
     // Show the hero's attack-range circle while Space is held.
     this.hero.showRangeCircle = this.hero.alive && attackPressed;
 
+    // Tick ability cooldowns every frame (even while dead so they drain naturally).
+    updateAbilityCooldowns(this.hero, dtSeconds);
+
+    // Detect fresh ability key presses and attempt to cast.  Each key is only
+    // triggered on the frame the key transitions from up → down so holding a
+    // key never re-fires the ability.
+    const ABILITY_KEY_CODES = [
+      ['Q', 'KeyQ'],
+      ['F', 'KeyF'],
+      ['E', 'KeyE'],
+      ['R', 'KeyR'],
+    ];
+    for (const [key, code] of ABILITY_KEY_CODES) {
+      const pressed = this.input.isPressed(code);
+      if (pressed && !this.wasAbilityPressed[key]) {
+        castAbility(this.hero, key, this.entities, this.projectiles);
+      }
+      this.wasAbilityPressed[key] = pressed;
+    }
+
     this.spawnSystem.update(this, dtMs);
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
+    // Advance hero-fired projectiles and resolve their collisions with entities.
+    updateProjectiles(this.projectiles, this.entities, dtSeconds);
     // Spawn the hit spark immediately when the hero's attack lands, regardless
     // of animation phase, so spamming space never drops the visual feedback.
     if (this.hero.pendingHitTarget) {
@@ -236,8 +266,12 @@ export class Game {
       return;
     }
 
-    this.hero.vx = (move.x / magnitude) * speed;
-    this.hero.vy = (move.y / magnitude) * speed;
+    const normalX = move.x / magnitude;
+    const normalY = move.y / magnitude;
+    this.hero.vx = normalX * speed;
+    this.hero.vy = normalY * speed;
+    // Persist direction so Dash and Power Shot can reference it even when idle.
+    this.hero.lastMoveDir = { x: normalX, y: normalY };
   }
 
   // Instantly restores the hero to full health when they are standing near the
@@ -286,6 +320,8 @@ export class Game {
     this.hero.attackAnimPhase = 'idle';
     this.hero.attackAnimStartMs = 0;
     this.hero.pendingHitTarget = null;
+    // Clear stale held-key flags so abilities don't auto-fire on respawn.
+    this.wasAbilityPressed = { Q: false, F: false, E: false, R: false };
   }
 
   // Advance the hero's attack-animation phase based on elapsed time and spawn
@@ -340,21 +376,16 @@ export class Game {
       this.renderer.drawEffect(effect);
     }
 
+    // Draw hero-fired projectiles on top of effects but below the HUD.
+    this.renderer.drawProjectiles(this.projectiles);
+
     this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);
     this.renderer.drawText('Attack: Space', 12, 40);
-    this.renderer.drawText('Restart: R (after match ends)', 12, 56);
-    this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 72);
+    this.renderer.drawText('Abilities: Q / F / E / R', 12, 56);
+    this.renderer.drawText('Restart: R (after match ends)', 12, 72);
+    this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
     this.renderer.drawText(
       `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
-      12,
-      88,
-      { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
-    );
-    const attackCooldown = this.hero.attackCooldownMs ?? 0;
-    const elapsedSinceLastAttack = this.lastFrameAt - (this.hero.lastAttackMs ?? 0);
-    const attackCooldownRemaining = Math.max(0, attackCooldown - elapsedSinceLastAttack);
-    this.renderer.drawText(
-      `Hero Attack CD: ${(attackCooldownRemaining / 1000).toFixed(2)}s`,
       12,
       104,
       { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
@@ -368,6 +399,9 @@ export class Game {
         { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
       );
     }
+
+    // Ability HUD drawn last so it sits on top of everything.
+    this.renderer.drawAbilityHUD(this.hero);
 
     if (this.state === GAME_STATES.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');

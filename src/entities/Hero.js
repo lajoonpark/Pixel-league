@@ -1,5 +1,6 @@
 // Hero entity controlled by the player.
 import { CONFIG } from '../config.js';
+import { createHeroAbilities } from '../systems/abilitySystem.js';
 
 export class Hero {
   constructor(x, y, team = 'blue') {
@@ -33,5 +34,10 @@ export class Hero {
     this.attackAnimStartMs = 0;
     // Set by combatSystem when the hero lands a hit; consumed by game.js to spawn the hit spark.
     this.pendingHitTarget = null;
+    // Ability slot data (Q / F / E / R).
+    this.abilities = createHeroAbilities();
+    // Last intentional movement direction; used by Dash and Power Shot.
+    // Defaults to rightward (toward the enemy base) before the first input.
+    this.lastMoveDir = { x: 1, y: 0 };
   }
 }

@@ -547,6 +547,97 @@ export class Renderer {
     this.ctx.fillText(text, x, y);
   }
 
+  // ── Projectiles ───────────────────────────────────────────────────────────────
+
+  // Draw a single hero-fired projectile as a filled rectangle in world space.
+  drawProjectile(projectile) {
+    if (!projectile.alive) { return; }
+    const { x, y } = this.camera.worldToScreen(projectile.x, projectile.y);
+    this.ctx.fillStyle = projectile.color;
+    this.ctx.fillRect(
+      Math.round(x - projectile.width / 2),
+      Math.round(y - projectile.height / 2),
+      projectile.width,
+      projectile.height
+    );
+  }
+
+  // Iterate and draw all live projectiles.
+  drawProjectiles(projectiles) {
+    for (const proj of projectiles) {
+      this.drawProjectile(proj);
+    }
+  }
+
+  // ── Ability HUD ───────────────────────────────────────────────────────────────
+
+  // Draw the Q / F / E / R ability bar centred at the bottom of the screen.
+  // Each slot shows: key label, ability name, and cooldown remaining (or "Ready").
+  // Uses rectangles and text only – no images or canvas arcs.
+  drawAbilityHUD(hero) {
+    if (!hero || !hero.abilities) { return; }
+
+    const abilities = hero.abilities;
+    const SLOT_W = 72;
+    const SLOT_H = 62;
+    const GAP = 8;
+    const BOTTOM_MARGIN = 10;
+    const totalW = abilities.length * SLOT_W + (abilities.length - 1) * GAP;
+    const startX = Math.round((this.canvas.width - totalW) / 2);
+    const startY = this.canvas.height - BOTTOM_MARGIN - SLOT_H;
+    const ctx = this.ctx;
+
+    ctx.save();
+    // Disable anti-aliasing for crisp pixel-art text alignment.
+    ctx.imageSmoothingEnabled = false;
+
+    for (let i = 0; i < abilities.length; i++) {
+      const ability = abilities[i];
+      const slotX = startX + i * (SLOT_W + GAP);
+      const slotY = startY;
+      const isReady = ability.currentCooldown <= 0;
+
+      // ── Background ────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(8, 12, 24, 0.82)';
+      ctx.fillRect(slotX, slotY, SLOT_W, SLOT_H);
+
+      // ── Border (green = ready, grey = on cooldown) ────────────────────────
+      ctx.strokeStyle = isReady ? '#44ff88' : '#44556677';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(slotX + 1, slotY + 1, SLOT_W - 2, SLOT_H - 2);
+
+      // ── Cooldown fill overlay (darkens the slot while on cooldown) ────────
+      if (!isReady) {
+        const fillFraction = ability.currentCooldown / ability.cooldown;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+        ctx.fillRect(slotX + 2, slotY + 2, SLOT_W - 4, Math.round((SLOT_H - 4) * fillFraction));
+      }
+
+      // ── Key label ─────────────────────────────────────────────────────────
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText(ability.key, slotX + 6, slotY + 18);
+
+      // ── Ability name ──────────────────────────────────────────────────────
+      ctx.fillStyle = '#b8c8e0';
+      ctx.font = '9px monospace';
+      ctx.fillText(ability.name, slotX + 6, slotY + 34);
+
+      // ── Cooldown status ───────────────────────────────────────────────────
+      if (isReady) {
+        ctx.fillStyle = '#44ff88';
+        ctx.font = '9px monospace';
+        ctx.fillText('Ready', slotX + 6, slotY + 50);
+      } else {
+        ctx.fillStyle = '#ff9966';
+        ctx.font = '9px monospace';
+        ctx.fillText(`${ability.currentCooldown.toFixed(1)}s`, slotX + 6, slotY + 50);
+      }
+    }
+
+    ctx.restore();
+  }
+
   drawCenteredOverlay(title, subtitle) {
     this.ctx.fillStyle = this.config.ui.overlay.background;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
