@@ -549,10 +549,34 @@ export class Renderer {
 
   // ── Projectiles ───────────────────────────────────────────────────────────────
 
-  // Draw a single hero-fired projectile as a filled rectangle in world space.
+  // Draw a single hero-fired projectile.  Uses looping sprite-frame animation
+  // when the projectile carries animFrames; falls back to a filled rectangle.
   drawProjectile(projectile) {
     if (!projectile.alive) { return; }
     const { x, y } = this.camera.worldToScreen(projectile.x, projectile.y);
+
+    if (projectile.animFrames) {
+      const elapsed = this.nowMs - (projectile.animStartMs ?? 0);
+      const frameDur = projectile.animFrameDuration ?? 80;
+      const frameIdx = Math.floor(elapsed / frameDur) % projectile.animFrames.length;
+      const frame = projectile.animFrames[frameIdx];
+
+      if (frame) {
+        this.ctx.save();
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.drawImage(
+          frame,
+          Math.round(x - projectile.width / 2),
+          Math.round(y - projectile.height / 2),
+          projectile.width,
+          projectile.height
+        );
+        this.ctx.restore();
+        return;
+      }
+    }
+
+    // Fallback: plain coloured rectangle.
     this.ctx.fillStyle = projectile.color;
     this.ctx.fillRect(
       Math.round(x - projectile.width / 2),
@@ -569,12 +593,75 @@ export class Renderer {
     }
   }
 
+  // ── VFX effects (sprite-frame animations) ────────────────────────────────────
+
+  // Draw a single sprite-frame VFX effect from the VfxSystem pool.
+  // Uses the effect's frames array for animation; falls back to a placeholder
+  // coloured rectangle when frames are null or unavailable.
+  drawVfxEffect(effect) {
+    const nowMs = this.nowMs;
+    const elapsed = nowMs - effect.startMs;
+    const totalDuration = effect.frameDuration * effect.totalFrames;
+    const progress = Math.min(elapsed / totalDuration, 1);
+
+    // Fade out during the final 20% of the animation.
+    const FADE_START = 0.8;
+    const alpha = progress > FADE_START
+      ? 1 - (progress - FADE_START) / (1 - FADE_START)
+      : 1;
+
+    const { x, y } = this.camera.worldToScreen(effect.x, effect.y);
+    const ctx = this.ctx;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = Math.max(0, alpha);
+
+    if (effect.frames) {
+      const rawIdx = Math.floor(elapsed / effect.frameDuration);
+      const frameIdx = effect.loop
+        ? rawIdx % effect.frames.length
+        : Math.min(rawIdx, effect.frames.length - 1);
+      const frame = effect.frames[frameIdx];
+
+      if (frame) {
+        ctx.drawImage(
+          frame,
+          Math.round(x - effect.width / 2),
+          Math.round(y - effect.height / 2),
+          effect.width,
+          effect.height
+        );
+        ctx.restore();
+        return;
+      }
+    }
+
+    // Fallback placeholder: small coloured rectangle.
+    ctx.fillStyle = effect.color;
+    ctx.fillRect(
+      Math.round(x - effect.width / 4),
+      Math.round(y - effect.height / 4),
+      Math.round(effect.width / 2),
+      Math.round(effect.height / 2)
+    );
+    ctx.restore();
+  }
+
+  // Iterate and draw all VFX system effects.
+  drawVfxEffects(effects) {
+    for (const effect of effects) {
+      this.drawVfxEffect(effect);
+    }
+  }
+
   // ── Ability HUD ───────────────────────────────────────────────────────────────
 
   // Draw the Q / F / E / R ability bar centred at the bottom of the screen.
-  // Each slot shows: key label, ability name, and cooldown remaining (or "Ready").
-  // Uses rectangles and text only – no images or canvas arcs.
-  drawAbilityHUD(hero) {
+  // When icon images are provided, each slot shows the icon with a cooldown
+  // overlay; otherwise it falls back to a text-only layout.
+  // icons: { Q: HTMLImageElement|null, F, E, R } from assetLoader (optional).
+  drawAbilityHUD(hero, icons = {}) {
     if (!hero || !hero.abilities) { return; }
 
     const abilities = hero.abilities;
@@ -582,13 +669,13 @@ export class Renderer {
     const SLOT_H = 62;
     const GAP = 8;
     const BOTTOM_MARGIN = 10;
+    const ICON_SIZE = 40;
     const totalW = abilities.length * SLOT_W + (abilities.length - 1) * GAP;
     const startX = Math.round((this.canvas.width - totalW) / 2);
     const startY = this.canvas.height - BOTTOM_MARGIN - SLOT_H;
     const ctx = this.ctx;
 
     ctx.save();
-    // Disable anti-aliasing for crisp pixel-art text alignment.
     ctx.imageSmoothingEnabled = false;
 
     for (let i = 0; i < abilities.length; i++) {
@@ -596,42 +683,62 @@ export class Renderer {
       const slotX = startX + i * (SLOT_W + GAP);
       const slotY = startY;
       const isReady = ability.currentCooldown <= 0;
+      const icon = icons?.[ability.key] ?? null;
 
       // ── Background ────────────────────────────────────────────────────────
       ctx.fillStyle = 'rgba(8, 12, 24, 0.82)';
       ctx.fillRect(slotX, slotY, SLOT_W, SLOT_H);
 
+      if (icon) {
+        // ── Icon image ──────────────────────────────────────────────────────
+        const iconX = Math.round(slotX + (SLOT_W - ICON_SIZE) / 2);
+        const iconY = slotY + 4;
+        ctx.drawImage(icon, iconX, iconY, ICON_SIZE, ICON_SIZE);
+
+        // ── Cooldown fill overlay (darkens over icon while on cooldown) ──────
+        if (!isReady) {
+          const fillFraction = ability.currentCooldown / ability.cooldown;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.60)';
+          ctx.fillRect(slotX + 2, slotY + 2, SLOT_W - 4, Math.round((SLOT_H - 4) * fillFraction));
+        }
+
+        // ── Key label (small overlay at top-left of slot) ─────────────────
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(ability.key, slotX + 4, slotY + 13);
+      } else {
+        // ── Text-only fallback layout ─────────────────────────────────────
+
+        // Cooldown fill overlay
+        if (!isReady) {
+          const fillFraction = ability.currentCooldown / ability.cooldown;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+          ctx.fillRect(slotX + 2, slotY + 2, SLOT_W - 4, Math.round((SLOT_H - 4) * fillFraction));
+        }
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(ability.key, slotX + 6, slotY + 18);
+
+        ctx.fillStyle = '#b8c8e0';
+        ctx.font = '9px monospace';
+        ctx.fillText(ability.name, slotX + 6, slotY + 34);
+      }
+
       // ── Border (green = ready, grey = on cooldown) ────────────────────────
-      ctx.strokeStyle = isReady ? '#44ff88' : '#44556677';
+      ctx.strokeStyle = isReady ? '#44ff88' : '#445566';
       ctx.lineWidth = 2;
       ctx.strokeRect(slotX + 1, slotY + 1, SLOT_W - 2, SLOT_H - 2);
 
-      // ── Cooldown fill overlay (darkens the slot while on cooldown) ────────
-      if (!isReady) {
-        const fillFraction = ability.currentCooldown / ability.cooldown;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
-        ctx.fillRect(slotX + 2, slotY + 2, SLOT_W - 4, Math.round((SLOT_H - 4) * fillFraction));
-      }
-
-      // ── Key label ─────────────────────────────────────────────────────────
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px monospace';
-      ctx.fillText(ability.key, slotX + 6, slotY + 18);
-
-      // ── Ability name ──────────────────────────────────────────────────────
-      ctx.fillStyle = '#b8c8e0';
-      ctx.font = '9px monospace';
-      ctx.fillText(ability.name, slotX + 6, slotY + 34);
-
-      // ── Cooldown status ───────────────────────────────────────────────────
+      // ── Cooldown status text (bottom row) ─────────────────────────────────
       if (isReady) {
         ctx.fillStyle = '#44ff88';
         ctx.font = '9px monospace';
-        ctx.fillText('Ready', slotX + 6, slotY + 50);
+        ctx.fillText('Ready', slotX + 6, slotY + SLOT_H - 6);
       } else {
         ctx.fillStyle = '#ff9966';
         ctx.font = '9px monospace';
-        ctx.fillText(`${ability.currentCooldown.toFixed(1)}s`, slotX + 6, slotY + 50);
+        ctx.fillText(`${ability.currentCooldown.toFixed(1)}s`, slotX + 6, slotY + SLOT_H - 6);
       }
     }
 

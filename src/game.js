@@ -14,12 +14,14 @@ import { collisionSystem } from './systems/collisionSystem.js';
 import { combatSystem } from './systems/combatSystem.js';
 import { healthSystem } from './systems/healthSystem.js';
 import { EffectSystem } from './systems/effectSystem.js';
+import { VfxSystem } from './systems/vfxSystem.js';
 import { castAbility, updateAbilityCooldowns } from './systems/abilitySystem.js';
 import { updateProjectiles } from './systems/projectileSystem.js';
 
 export class Game {
-  constructor(canvas) {
+  constructor(canvas, assets = { frames: {}, icons: {} }) {
     this.canvas = canvas;
+    this.assets = assets;
     this.map = createMap(CONFIG);
     this.input = new Input();
     this.camera = new Camera(canvas.width, canvas.height, this.map.width, this.map.height);
@@ -27,6 +29,7 @@ export class Game {
     this.entities = [];
     this.spawnSystem = createSpawnSystem(CONFIG.waves);
     this.effectSystem = new EffectSystem();
+    this.vfxSystem = new VfxSystem();
     this.lastFrameAt = 0;
     this.fps = 0;
     this.waveCount = 0;
@@ -102,6 +105,7 @@ export class Game {
     this.spawnSystem.reset();
     this.waveCount = 0;
     this.effectSystem.effects = [];
+    this.vfxSystem.effects = [];
     this.projectiles = [];
     this.setupWorld();
     this.input.keys.clear();
@@ -193,10 +197,11 @@ export class Game {
       ['E', 'KeyE'],
       ['R', 'KeyR'],
     ];
+    const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
     for (const [key, code] of ABILITY_KEY_CODES) {
       const pressed = this.input.isPressed(code);
       if (pressed && !this.wasAbilityPressed[key]) {
-        castAbility(this.hero, key, this.entities, this.projectiles);
+        castAbility(this.hero, key, this.entities, this.projectiles, vfxCtx);
       }
       this.wasAbilityPressed[key] = pressed;
     }
@@ -205,7 +210,7 @@ export class Game {
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
     // Advance hero-fired projectiles and resolve their collisions with entities.
-    updateProjectiles(this.projectiles, this.entities, dtSeconds);
+    updateProjectiles(this.projectiles, this.entities, dtSeconds, nowMs);
     // Spawn the hit spark immediately when the hero's attack lands, regardless
     // of animation phase, so spamming space never drops the visual feedback.
     if (this.hero.pendingHitTarget) {
@@ -240,6 +245,7 @@ export class Game {
     }
     this._advanceHeroAttackAnim(nowMs);
     this.effectSystem.update(nowMs);
+    this.vfxSystem.update(nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
     collisionSystem(this.entities, this.map);
     healthSystem(this.entities, nowMs);
@@ -376,6 +382,9 @@ export class Game {
       this.renderer.drawEffect(effect);
     }
 
+    // Draw sprite-frame VFX ability effects (above world, below projectiles).
+    this.renderer.drawVfxEffects(this.vfxSystem.effects);
+
     // Draw hero-fired projectiles on top of effects but below the HUD.
     this.renderer.drawProjectiles(this.projectiles);
 
@@ -401,7 +410,7 @@ export class Game {
     }
 
     // Ability HUD drawn last so it sits on top of everything.
-    this.renderer.drawAbilityHUD(this.hero);
+    this.renderer.drawAbilityHUD(this.hero, this.assets?.icons);
 
     if (this.state === GAME_STATES.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');

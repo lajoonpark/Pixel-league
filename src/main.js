@@ -2,6 +2,7 @@
 import { CONFIG } from './config.js';
 import { Game } from './game.js';
 import { createSpriteRegistry } from './sprites.js';
+import { loadAbilityAssets } from './assets/assetLoader.js';
 
 const canvas = document.getElementById('game-canvas');
 if (!(canvas instanceof HTMLCanvasElement)) {
@@ -15,5 +16,9 @@ canvas.height = CONFIG.canvas.height;
 // renderer's sprite registry is populated before the first frame renders.
 CONFIG.rendering.sprites = createSpriteRegistry(CONFIG);
 
-const game = new Game(canvas);
+// Load ability sprite-frame assets and UI icons.  Missing files resolve to
+// null so the game always starts, even if artwork is not yet in place.
+const assets = await loadAbilityAssets();
+
+const game = new Game(canvas, assets);
 game.start();
