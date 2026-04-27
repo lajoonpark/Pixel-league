@@ -16,14 +16,16 @@ export const MP_EVENTS = {
   BASIC_ATTACK: 'BASIC_ATTACK',
 };
 
+// Unambiguous characters used in room codes (no 0/O/1/I to avoid confusion).
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ROOM_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function generateRoomCode() {
-  // Unambiguous uppercase alphanumeric characters (no 0/O/1/I).
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
   }
   return code;
 }
@@ -89,8 +91,8 @@ export class MultiplayerService {
     if (!supabase) throw new Error('Supabase is not configured.');
 
     const code = roomCode.trim().toUpperCase();
-    if (!/^[A-Z2-9]{6}$/.test(code)) {
-      throw new Error('Invalid room code. Must be 6 uppercase letters/numbers.');
+    if (!ROOM_CODE_RE.test(code)) {
+      throw new Error('Invalid room code. Must be 6 unambiguous uppercase letters/numbers.');
     }
 
     this.roomCode = code;
