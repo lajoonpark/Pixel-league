@@ -173,6 +173,10 @@ export class MultiplayerService {
             });
             resolve();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            // Null out the channel reference immediately so that leaveRoom()
+            // doesn't try to untrack/unsubscribe a broken channel (which can
+            // hang indefinitely and block _returnToMenu from being called).
+            this._channel = null;
             reject(new Error(`Connection failed: ${status}${err ? ` — ${err.message}` : ''}`));
           }
         });
@@ -262,13 +266,20 @@ export class MultiplayerService {
 
   async leaveRoom() {
     if (!this._channel) return;
-    try {
-      await this._channel.untrack();
-      await this._channel.unsubscribe();
-    } catch { /* ignore */ }
+    // Capture and clear state first so callers are unblocked even if the
+    // Supabase async cleanup below is slow or never resolves.
+    const ch = this._channel;
     this._channel = null;
     this.roomCode = null;
     this.isHost = false;
     this.myPlayerNumber = null;
+    // Best-effort cleanup with a 3-second cap so a broken/slow channel
+    // can never block the caller (e.g. _returnToMenu) indefinitely.
+    try {
+      await Promise.race([
+        (async () => { await ch.untrack(); await ch.unsubscribe(); })(),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    } catch { /* ignore */ }
   }
 }
