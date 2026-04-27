@@ -23,13 +23,64 @@ Then open: `http://localhost:8000`
 
 | Key / Input | Action |
 |-------------|--------|
-| Right Click | Move hero |
-| Space | Basic attack |
-| Q | Slash (instant melee damage) |
-| W | Dash (burst movement in current direction) |
-| E | Energy Blast (fire projectile) |
-| R | Energy Burst (AoE damage around hero) |
+| Right Click | Move hero / cancel ability targeting |
+| Left Click | Basic attack (or confirm selected ability) |
+| Q | Select Slash ability (then left click to cast) |
+| W | Select Dash ability (then left click to cast) |
+| E | Select Energy Blast ability (then left click to cast) |
+| R | Select Energy Burst ability (then left click to cast) |
+| Esc | Cancel ability targeting |
 | R *(after game ends)* | Restart match |
+
+### How targeting modes work
+
+Pressing **Q / W / E / R** enters that ability's *targeting mode*:
+
+- A range circle appears around the hero showing cast range.
+- A hit-area preview appears near the mouse cursor (circle, destination marker, or AoE).
+- **Left click** confirms the cast toward the mouse position and exits targeting mode.
+- **Right click** cancels targeting mode and moves the hero instead.
+- **Esc** cancels targeting without moving.
+- Pressing a *different* ability key while in targeting mode switches to that ability.
+- The selected ability slot in the HUD is highlighted in gold with "ACTIVE" status.
+
+### Basic attack (left click)
+
+When no ability is selected, left-clicking near an enemy triggers a basic attack:
+
+- If the enemy is within attack range, the hero attacks immediately.
+- If the enemy is out of range, the hero moves toward it and attacks automatically when close enough.
+- Clicking empty space with no ability selected does nothing.
+
+### Hit area / range indicators
+
+| Ability | Indicator |
+|---------|-----------|
+| Basic attack | Attack range circle when range circle is shown |
+| Q Slash | Cast range circle around hero + small hit-area circle at slash endpoint |
+| W Dash | Max dash range circle around hero + dashed line to destination + diamond marker |
+| E Energy Blast | Dashed line from hero toward mouse (capped at cast range) + small impact circle |
+| R Energy Burst | Cast range circle around hero + AoE circle at mouse (turns red when out of range) |
+
+### Tuning cast ranges and AoE sizes
+
+All ability parameters live in `src/systems/abilitySystem.js` inside `createHeroAbilities()`:
+
+```js
+// Q – Slash
+castRange: 80,   // distance of slash endpoint from hero
+hitRadius: 35,   // radius of hit-area circle at endpoint
+
+// W – Dash
+distance: 150,   // max dash distance in pixels
+
+// E – Energy Blast (Power Shot)
+castRange: 400,  // max projectile travel distance
+
+// R – Energy Burst
+castRange: 200,  // max distance from hero the AoE center can be placed
+aoeRadius: 80,   // radius of the explosion
+```
 
 ## Project structure
 

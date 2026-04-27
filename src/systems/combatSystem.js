@@ -53,6 +53,34 @@ function setLastAttackTime(attacker, nowMs) {
   attacker.lastAttackMs = nowMs;
 }
 
+// Returns the nearest enemy to world point (px, py) within searchRadius that
+// the hero (identified by attackerTeam) can basic-attack.
+// Returns null when no valid target is found.
+export function findEnemyNearPoint(entities, px, py, searchRadius, attackerTeam) {
+  const rSq = searchRadius * searchRadius;
+  let nearest = null;
+  let nearestDistSq = Infinity;
+
+  for (const entity of entities) {
+    if (entity.team === attackerTeam) { continue; }
+    if (
+      !isLivingMinion(entity)
+      && !isLivingTower(entity)
+      && !isLivingBase(entity)
+    ) { continue; }
+
+    const dx = entity.x - px;
+    const dy = entity.y - py;
+    const dSq = dx * dx + dy * dy;
+    if (dSq <= rSq && dSq < nearestDistSq) {
+      nearestDistSq = dSq;
+      nearest = entity;
+    }
+  }
+
+  return nearest;
+}
+
 // Selects the best target for the given attacker within attackRangeSq.
 // Towers and bases always prefer the nearest minion; they only fall back to
 // the hero when no minion is in range.  Minions may not target the enemy base

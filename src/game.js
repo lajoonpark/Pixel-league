@@ -11,12 +11,13 @@ import { createMap } from './world/map.js';
 import { createSpawnSystem } from './systems/spawnSystem.js';
 import { movementSystem } from './systems/movementSystem.js';
 import { collisionSystem } from './systems/collisionSystem.js';
-import { combatSystem } from './systems/combatSystem.js';
+import { combatSystem, findEnemyNearPoint } from './systems/combatSystem.js';
 import { healthSystem } from './systems/healthSystem.js';
 import { EffectSystem } from './systems/effectSystem.js';
 import { VfxSystem } from './systems/vfxSystem.js';
 import { castAbility, updateAbilityCooldowns } from './systems/abilitySystem.js';
 import { updateProjectiles } from './systems/projectileSystem.js';
+import { TargetingSystem, TARGETING_STATE } from './systems/targetingSystem.js';
 
 export class Game {
   constructor(canvas, assets = { frames: {}, icons: {} }) {
@@ -30,13 +31,14 @@ export class Game {
     this.spawnSystem = createSpawnSystem(CONFIG.waves);
     this.effectSystem = new EffectSystem();
     this.vfxSystem = new VfxSystem();
+    this.targetingSystem = new TargetingSystem();
     this.lastFrameAt = 0;
     this.fps = 0;
     this.waveCount = 0;
-    this.wasAttackPressed = false;
     // Tracks previous-frame pressed state for each ability key to enable
-    // fresh-press detection (cast fires once per key-down, not while held).
+    // fresh-press detection (targeting mode entered once per key-down).
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
+    this.wasEscapePressed = false;
     // Live hero-fired projectiles (Power Shot).  Kept separate from entities.
     this.projectiles = [];
     // Deferred VFX spawns: [{spawnAtMs, type, x, y, frames, options}].
@@ -116,7 +118,10 @@ export class Game {
     this.setupWorld();
     this.input.keys.clear();
     this.input._rightClickThisFrame = false;
-    this.wasAttackPressed = false;
+    this.input._leftClickThisFrame = false;
+    this.targetingSystem.cancel();
+    this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
+    this.wasEscapePressed = false;
     this.camera.follow(this.hero);
   }
 
@@ -180,68 +185,116 @@ export class Game {
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
 
-    // Process right-click to set hero movement target (click-to-move).
-    if (this.hero.alive && this.input.consumeRightClick()) {
-      const worldX = this.input.mouseX + this.camera.x;
-      const worldY = this.input.mouseY + this.camera.y;
-      // Clamp target to map bounds (accounting for hero half-size).
-      const hw = this.hero.width / 2;
-      const hh = this.hero.height / 2;
-      const clampedX = Math.max(this.map.x + hw, Math.min(this.map.x + this.map.width - hw, worldX));
-      const clampedY = Math.max(this.map.y + hh, Math.min(this.map.y + this.map.height - hh, worldY));
-      this.hero.targetPosition = { x: clampedX, y: clampedY };
-      this.clickMarker = { x: clampedX, y: clampedY, spawnMs: nowMs };
+    // Convert current mouse screen position to world coordinates.
+    const mouseWorldX = this.input.mouseX + this.camera.x;
+    const mouseWorldY = this.input.mouseY + this.camera.y;
+
+    // ── Escape: cancel targeting mode ────────────────────────────────────────
+    const escapePressed = this.input.isPressed('Escape');
+    if (escapePressed && !this.wasEscapePressed) {
+      this.targetingSystem.cancel();
     }
+    this.wasEscapePressed = escapePressed;
 
-    this.updateHeroVelocity();
-    const attackPressed = this.input.isAttackPressed();
-    if (this.hero.alive && attackPressed && !this.wasAttackPressed) {
-      this.hero.isAttackRequested = true;
-      // Start the diagonal sword animation.
-      this.hero.attackAnimPhase = 'windUp';
-      this.hero.attackAnimStartMs = nowMs;
-      // Spawn windup VFX at hero position.
-      const windupFrames = this.assets?.vfxFrames?.basic_windup ?? null;
-      this.vfxSystem.spawn('basic_windup', this.hero.x, this.hero.y, nowMs, windupFrames, {
-        frameDuration: 60,
-        width: 32,
-        height: 32,
-        color: '#ffb833',
-      });
-    }
-    this.wasAttackPressed = attackPressed;
-
-    // Show the hero's attack-range circle while Space is held.
-    this.hero.showRangeCircle = this.hero.alive && attackPressed;
-
-    // Tick ability cooldowns every frame (even while dead so they drain naturally).
-    updateAbilityCooldowns(this.hero, dtSeconds);
-
-    // Detect fresh ability key presses and attempt to cast.  Each key is only
-    // triggered on the frame the key transitions from up → down so holding a
-    // key never re-fires the ability.
+    // ── Ability key presses: enter targeting mode ─────────────────────────────
     const ABILITY_KEY_CODES = [
       ['Q', 'KeyQ'],
       ['W', 'KeyW'],
       ['E', 'KeyE'],
       ['R', 'KeyR'],
     ];
-    const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
     for (const [key, code] of ABILITY_KEY_CODES) {
       const pressed = this.input.isPressed(code);
-      if (pressed && !this.wasAbilityPressed[key]) {
-        castAbility(this.hero, key, this.entities, this.projectiles, vfxCtx);
+      if (pressed && !this.wasAbilityPressed[key] && this.hero.alive) {
+        this.targetingSystem.selectAbility(key);
       }
       this.wasAbilityPressed[key] = pressed;
     }
+
+    // ── Right click: cancel targeting, then move ──────────────────────────────
+    if (this.hero.alive && this.input.consumeRightClick()) {
+      // Cancel any active targeting mode first.
+      this.targetingSystem.cancel();
+
+      // Then apply click-to-move.
+      const hw = this.hero.width / 2;
+      const hh = this.hero.height / 2;
+      const clampedX = Math.max(this.map.x + hw, Math.min(this.map.x + this.map.width - hw, mouseWorldX));
+      const clampedY = Math.max(this.map.y + hh, Math.min(this.map.y + this.map.height - hh, mouseWorldY));
+      this.hero.targetPosition = { x: clampedX, y: clampedY };
+      this.hero.pendingAttackTarget = null;
+      this.clickMarker = { x: clampedX, y: clampedY, spawnMs: nowMs };
+    }
+
+    // ── Left click: cast ability or basic attack ──────────────────────────────
+    if (this.hero.alive && this.input.consumeLeftClick()) {
+      const selectedKey = this.targetingSystem.getSelectedKey();
+
+      if (selectedKey) {
+        // ── Cast selected ability toward mouse position ────────────────────
+        const targetPoint = { x: mouseWorldX, y: mouseWorldY };
+        const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
+        const success = castAbility(this.hero, selectedKey, this.entities, this.projectiles, vfxCtx, targetPoint);
+        if (success) {
+          // Cancel targeting mode after a successful cast.
+          this.targetingSystem.cancel();
+        }
+        // If cast fails (e.g. cooldown or out of range for R), keep targeting mode active.
+      } else {
+        // ── Basic attack: find nearest enemy near click point ─────────────
+        const CLICK_SEARCH_RADIUS = 32; // world-space pixels to search around click
+        const enemy = findEnemyNearPoint(this.entities, mouseWorldX, mouseWorldY, CLICK_SEARCH_RADIUS, this.hero.team);
+        if (enemy) {
+          const dx = enemy.x - this.hero.x;
+          const dy = enemy.y - this.hero.y;
+          const distSq = dx * dx + dy * dy;
+          const attackRangeSq = this.hero.attackRange * this.hero.attackRange;
+
+          if (distSq <= attackRangeSq) {
+            // In range: trigger basic attack immediately.
+            this._triggerBasicAttack(nowMs);
+          } else {
+            // Out of range: move toward the enemy and mark as pending attack target.
+            this.hero.targetPosition = { x: enemy.x, y: enemy.y };
+            this.hero.pendingAttackTarget = enemy;
+          }
+        }
+      }
+    }
+
+    this.updateHeroVelocity();
+
+    // ── Pending attack target: attack when hero reaches attack range ──────────
+    if (this.hero.alive && this.hero.pendingAttackTarget) {
+      const target = this.hero.pendingAttackTarget;
+      if (!target.alive || target.health <= 0) {
+        this.hero.pendingAttackTarget = null;
+      } else {
+        const dx = target.x - this.hero.x;
+        const dy = target.y - this.hero.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= this.hero.attackRange * this.hero.attackRange) {
+          this.hero.pendingAttackTarget = null;
+          this.hero.targetPosition = null;
+          this._triggerBasicAttack(nowMs);
+        }
+      }
+    }
+
+    // Show the hero's attack-range circle while any targeting mode is active or
+    // while the hero has a pending attack target.
+    this.hero.showRangeCircle = this.hero.alive
+      && (this.targetingSystem.isTargeting() || Boolean(this.hero.pendingAttackTarget));
+
+    // Tick ability cooldowns every frame (even while dead so they drain naturally).
+    updateAbilityCooldowns(this.hero, dtSeconds);
 
     this.spawnSystem.update(this, dtMs);
     this.waveCount = this.spawnSystem.getWaveCount();
     combatSystem(this.entities, nowMs);
     // Advance hero-fired projectiles and resolve their collisions with entities.
     updateProjectiles(this.projectiles, this.entities, dtSeconds, nowMs);
-    // Spawn the hit spark immediately when the hero's attack lands, regardless
-    // of animation phase, so spamming space never drops the visual feedback.
+    // Spawn the hit spark immediately when the hero's attack lands.
     if (this.hero.pendingHitTarget) {
       const target = this.hero.pendingHitTarget;
       this.hero.pendingHitTarget = null;
@@ -345,6 +398,7 @@ export class Game {
       this.hero.vy = 0;
       this.hero.targetPosition = null;
       this.hero.isAttackRequested = false;
+      this.hero.pendingAttackTarget = null;
       return;
     }
 
@@ -374,6 +428,21 @@ export class Game {
     this.hero.vy = normalY * speed;
     // Persist direction so Dash and Power Shot can reference it.
     this.hero.lastMoveDir = { x: normalX, y: normalY };
+  }
+
+  // Trigger the hero's basic attack animation and set isAttackRequested.
+  _triggerBasicAttack(nowMs) {
+    const hero = this.hero;
+    hero.isAttackRequested = true;
+    hero.attackAnimPhase = 'windUp';
+    hero.attackAnimStartMs = nowMs;
+    const windupFrames = this.assets?.vfxFrames?.basic_windup ?? null;
+    this.vfxSystem.spawn('basic_windup', hero.x, hero.y, nowMs, windupFrames, {
+      frameDuration: 60,
+      width: 32,
+      height: 32,
+      color: '#ffb833',
+    });
   }
 
   // Instantly restores the hero to full health when they are standing near the
@@ -419,12 +488,15 @@ export class Game {
     this.hero.target = null;
     this.hero.targetPosition = null;
     this.hero.isAttackRequested = false;
+    this.hero.pendingAttackTarget = null;
     this.hero.respawnAtMs = 0;
     this.hero.attackAnimPhase = 'idle';
     this.hero.attackAnimStartMs = 0;
     this.hero.pendingHitTarget = null;
     // Clear stale held-key flags so abilities don't auto-fire on respawn.
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
+    this.wasEscapePressed = false;
+    this.targetingSystem.cancel();
   }
 
   // Advance the hero's attack-animation phase based on elapsed time and spawn
@@ -508,6 +580,19 @@ export class Game {
     // Draw hero-fired projectiles on top of effects but below the HUD.
     this.renderer.drawProjectiles(this.projectiles);
 
+    // Draw targeting range/preview indicators above the world layer.
+    if (this.hero.alive) {
+      const mouseWorldX = this.input.mouseX + this.camera.x;
+      const mouseWorldY = this.input.mouseY + this.camera.y;
+      this.renderer.drawTargetingOverlay(
+        this.hero,
+        this.targetingSystem.state,
+        this.hero.abilities,
+        mouseWorldX,
+        mouseWorldY
+      );
+    }
+
     // Draw click-to-move marker (fades over 500ms).
     if (this.clickMarker) {
       const MARKER_DURATION_MS = 500;
@@ -523,9 +608,20 @@ export class Game {
       }
     }
 
+    // ── HUD text ──────────────────────────────────────────────────────────────
+    const selectedKey = this.targetingSystem.getSelectedKey();
     this.renderer.drawText('Move: Right Click', 12, 24);
-    this.renderer.drawText('Attack: Space', 12, 40);
-    this.renderer.drawText('Abilities: Q / W / E / R', 12, 56);
+    this.renderer.drawText('Attack: Left Click', 12, 40);
+    if (selectedKey) {
+      this.renderer.drawText(
+        `Targeting: ${selectedKey} — Left Click to cast, Right Click / Esc to cancel`,
+        12,
+        56,
+        { font: CONFIG.ui.font, color: '#ffdc3c' }
+      );
+    } else {
+      this.renderer.drawText('Q / W / E / R = Select ability', 12, 56);
+    }
     this.renderer.drawText('Restart: R (after match ends)', 12, 72);
     this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
     this.renderer.drawText(
@@ -545,7 +641,7 @@ export class Game {
     }
 
     // Ability HUD drawn last so it sits on top of everything.
-    this.renderer.drawAbilityHUD(this.hero, this.assets?.icons);
+    this.renderer.drawAbilityHUD(this.hero, this.assets?.icons, selectedKey);
 
     if (this.state === GAME_STATES.gameOver) {
       this.renderer.drawCenteredOverlay(this.resultMessage, 'Press R to restart');

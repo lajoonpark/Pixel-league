@@ -7,6 +7,8 @@ export class Input {
     this.mouseY = 0;
     // Set to true on a right-click; consumed by game logic via consumeRightClick().
     this._rightClickThisFrame = false;
+    // Set to true on a left-click; consumed by game logic via consumeLeftClick().
+    this._leftClickThisFrame = false;
     // Canvas element used for mouse event registration (set in attach).
     this._canvas = null;
 
@@ -19,14 +21,14 @@ export class Input {
     this.handleMouseDown = (event) => {
       if (event.button === 2) {
         this._rightClickThisFrame = true;
+      } else if (event.button === 0) {
+        this._leftClickThisFrame = true;
       }
     };
     // Suppress the browser context menu so right-click works in-game.
     this.handleContextMenu = (event) => event.preventDefault();
 
-    this.bindings = {
-      attack: ['Space'],
-    };
+    this.bindings = {};
   }
 
   attach(canvas) {
@@ -66,7 +68,10 @@ export class Input {
     return clicked;
   }
 
-  isAttackPressed() {
-    return this.isAnyPressed(this.bindings.attack);
+  // Returns true once per left-click, then resets the flag.
+  consumeLeftClick() {
+    const clicked = this._leftClickThisFrame;
+    this._leftClickThisFrame = false;
+    return clicked;
   }
 }

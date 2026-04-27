@@ -26,7 +26,7 @@ export class Hero {
     this.attackCooldownMs = heroConfig.attackCooldownMs;
     this.lastAttackMs = 0;
     this.isAttackRequested = false;
-    // True while Space is held; drives the range-circle overlay.
+    // True while targeting is active; drives the range-circle overlay.
     this.showRangeCircle = false;
     this.respawnAtMs = 0;
     // Attack animation state.
@@ -38,6 +38,8 @@ export class Hero {
     this.abilities = createHeroAbilities();
     // Click-to-move target position in world coordinates (null = stationary).
     this.targetPosition = null;
+    // Enemy entity the hero is chasing to perform a basic attack when in range.
+    this.pendingAttackTarget = null;
     // Last intentional movement direction; used by Dash and Power Shot.
     // Defaults to rightward (toward the enemy base) before the first input.
     this.lastMoveDir = { x: 1, y: 0 };
