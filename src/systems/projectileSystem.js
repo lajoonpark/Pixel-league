@@ -23,7 +23,9 @@ function isHittableEnemy(team, entity) {
 // Advance all live projectiles by dtSeconds, apply collision damage, and
 // compact the array by removing any projectile that has expired or hit a target.
 // The array is mutated in-place so the reference held by game.js stays valid.
-export function updateProjectiles(projectiles, entities, dtSeconds) {
+// `nowMs` is forwarded to the optional `onHit` callback on each projectile so
+// VFX effects can be spawned at the correct timestamp.
+export function updateProjectiles(projectiles, entities, dtSeconds, nowMs = 0) {
   for (const proj of projectiles) {
     if (!proj.alive) { continue; }
 
@@ -48,6 +50,7 @@ export function updateProjectiles(projectiles, entities, dtSeconds) {
         if (entity.health <= 0 && typeof entity.alive === 'boolean') {
           entity.alive = false;
         }
+        proj.onHit?.(entity.x, entity.y, nowMs);
         proj.alive = false;
         break;
       }

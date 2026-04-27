@@ -108,39 +108,84 @@ function findEnemiesInRange(hero, entities, castRange) {
 
 // Q – Slash: deals damage to the nearest enemy in castRange.
 // Returns true on a successful hit, false if no valid target is in range.
-function castSlash(hero, ability, entities) {
+function castSlash(hero, ability, entities, vfxCtx) {
   const target = findNearestEnemy(hero, entities, ability.castRange);
   if (!target) { return false; }
+
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Slash arc animation at the hero's position.
+  vfxSystem?.spawn('q_slash_arc', hero.x, hero.y, nowMs,
+    f?.['q_slash_arc'] ?? null,
+    { frameDuration: 60, width: 80, height: 80, color: '#ffffff' }
+  );
 
   target.health = Math.max(0, target.health - ability.damage);
   if (target.health <= 0 && typeof target.alive === 'boolean') {
     target.alive = false;
   }
+
+  // Hit spark at the struck target's position.
+  vfxSystem?.spawn('q_slash_spark', target.x, target.y, nowMs,
+    f?.['q_slash_spark'] ?? null,
+    { frameDuration: 55, width: 48, height: 48, color: '#ffee55' }
+  );
+
   return true;
 }
 
 // F – Dash: teleports the hero a fixed distance in their last movement direction.
 // Returns true if a valid direction exists, false if the hero has never moved.
-function castDash(hero, ability) {
+function castDash(hero, ability, vfxCtx) {
   const dir = hero.lastMoveDir;
   const mag = Math.hypot(dir.x, dir.y);
   if (mag < 0.001) { return false; }
 
+  const startX = hero.x;
+  const startY = hero.y;
   hero.x += (dir.x / mag) * ability.distance;
   hero.y += (dir.y / mag) * ability.distance;
+
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Dust at dash origin.
+  vfxSystem?.spawn('f_dash_start', startX, startY, nowMs,
+    f?.['f_dash_start'] ?? null,
+    { frameDuration: 60, width: 48, height: 48, color: '#aaddff' }
+  );
+  // Trail puffs along the dash path (3 intermediate points).
+  const trailSteps = 3;
+  for (let i = 1; i <= trailSteps; i++) {
+    const t = i / (trailSteps + 1);
+    vfxSystem?.spawn('f_dash_trail',
+      startX + (hero.x - startX) * t,
+      startY + (hero.y - startY) * t,
+      nowMs,
+      f?.['f_dash_trail'] ?? null,
+      { frameDuration: 50, width: 40, height: 40, color: '#88ccff' }
+    );
+  }
+  // Dust at dash destination.
+  vfxSystem?.spawn('f_dash_end', hero.x, hero.y, nowMs,
+    f?.['f_dash_end'] ?? null,
+    { frameDuration: 55, width: 48, height: 48, color: '#aaddff' }
+  );
+
   return true;
 }
 
 // E – Power Shot: creates a rectangular projectile travelling in lastMoveDir.
 // Returns a projectile object to be pushed into game.projectiles, or null if
 // no valid direction is available.
-function castPowerShot(hero, ability) {
+function castPowerShot(hero, ability, vfxCtx) {
   const dir = hero.lastMoveDir;
   const mag = Math.hypot(dir.x, dir.y);
   if (mag < 0.001) { return null; }
 
   const PROJECTILE_SPEED = 350; // px / s
-  return {
+  const proj = {
     type: 'projectile',
     x: hero.x,
     y: hero.y,
@@ -155,11 +200,35 @@ function castPowerShot(hero, ability) {
     traveledDistance: 0,
     color: '#ffdd44',
   };
+
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Charge effect at the hero's cast position.
+  vfxSystem?.spawn('e_blast_charge', hero.x, hero.y, nowMs,
+    f?.['e_blast_charge'] ?? null,
+    { frameDuration: 70, width: 48, height: 48, color: '#44ff88' }
+  );
+  // Attach looping sprite frames to the projectile for in-flight animation.
+  proj.animFrames = f?.['e_blast_projectile'] ?? null;
+  proj.animFrameDuration = 80;
+  proj.animStartMs = nowMs;
+  // On-hit callback spawns the impact explosion VFX.
+  if (vfxSystem) {
+    proj.onHit = (hitX, hitY, hitNowMs) => {
+      vfxSystem.spawn('e_blast_impact', hitX, hitY, hitNowMs,
+        f?.['e_blast_impact'] ?? null,
+        { frameDuration: 70, width: 64, height: 64, color: '#ff8800' }
+      );
+    };
+  }
+
+  return proj;
 }
 
 // R – Smash: deals heavy damage to every enemy within castRange simultaneously.
 // Returns true if at least one enemy was hit, false if the area was empty.
-function castSmash(hero, ability, entities) {
+function castSmash(hero, ability, entities, vfxCtx) {
   const targets = findEnemiesInRange(hero, entities, ability.castRange);
   if (targets.length === 0) { return false; }
 
@@ -169,6 +238,28 @@ function castSmash(hero, ability, entities) {
       target.alive = false;
     }
   }
+
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Charge burst at the hero's position.
+  vfxSystem?.spawn('r_burst_charge', hero.x, hero.y, nowMs,
+    f?.['r_burst_charge'] ?? null,
+    { frameDuration: 75, width: 80, height: 80, color: '#ff44ff' }
+  );
+  // Explosion on each struck target.
+  for (const target of targets) {
+    vfxSystem?.spawn('r_burst_explosion', target.x, target.y, nowMs,
+      f?.['r_burst_explosion'] ?? null,
+      { frameDuration: 70, width: 80, height: 80, color: '#ff4400' }
+    );
+  }
+  // Fading aftershock ground ring centred on the hero.
+  vfxSystem?.spawn('r_burst_aftershock', hero.x, hero.y, nowMs,
+    f?.['r_burst_aftershock'] ?? null,
+    { frameDuration: 90, width: 120, height: 120, color: '#ffaa00' }
+  );
+
   return true;
 }
 
@@ -176,9 +267,10 @@ function castSmash(hero, ability, entities) {
 
 // Attempts to cast the ability bound to `key` (e.g. 'Q').
 // `projectiles` is the game-level array; Power Shot appends to it on success.
+// `vfxCtx` (optional) carries { vfxSystem, assets, nowMs } for spawning VFX.
 // Returns true if the ability fired, false if the cast failed (dead hero,
 // cooldown active, or no valid target / direction).
-export function castAbility(hero, key, entities, projectiles) {
+export function castAbility(hero, key, entities, projectiles, vfxCtx = null) {
   // Abilities cannot be cast while the hero is dead.
   if (!hero.alive) { return false; }
 
@@ -191,17 +283,17 @@ export function castAbility(hero, key, entities, projectiles) {
   let success = false;
 
   if (ability.castType === 'instant') {
-    success = castSlash(hero, ability, entities);
+    success = castSlash(hero, ability, entities, vfxCtx);
   } else if (ability.castType === 'dash') {
-    success = castDash(hero, ability);
+    success = castDash(hero, ability, vfxCtx);
   } else if (ability.castType === 'projectile') {
-    const projectile = castPowerShot(hero, ability);
+    const projectile = castPowerShot(hero, ability, vfxCtx);
     if (projectile) {
       projectiles.push(projectile);
       success = true;
     }
   } else if (ability.castType === 'aoe') {
-    success = castSmash(hero, ability, entities);
+    success = castSmash(hero, ability, entities, vfxCtx);
   }
 
   // Only start the cooldown timer when the cast actually succeeds.
