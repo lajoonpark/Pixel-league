@@ -37,7 +37,7 @@ export function createHeroAbilities() {
     {
       // E – Power Shot: rectangular projectile fired toward the targeted mouse position.
       id: 'powerShot',
-      name: 'Power Shot',
+      name: 'Energy Blast',
       key: 'E',
       cooldown: 6,
       currentCooldown: 0,
@@ -47,7 +47,7 @@ export function createHeroAbilities() {
     },
     {
       // R – Energy Burst: AoE explosion at the targeted mouse position within cast range.
-      id: 'smash',
+      id: 'energyBurst',
       name: 'Energy Burst',
       key: 'R',
       cooldown: 12,
