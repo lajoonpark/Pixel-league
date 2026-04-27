@@ -23,6 +23,22 @@ export class Menu {
         this.onPlay();
       }
     };
+
+    // Touch support: scale touch coords to canvas logical coordinates.
+    this.handleTouchEnd = (e) => {
+      e.preventDefault();
+      for (const touch of e.changedTouches) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (touch.clientX - rect.left) * scaleX;
+        const y = (touch.clientY - rect.top) * scaleY;
+        if (this._isOverButton(x, y)) {
+          this.onPlay();
+          return;
+        }
+      }
+    };
   }
 
   // ── button geometry (derived from canvas size) ────────────────────────────
@@ -42,11 +58,13 @@ export class Menu {
   attach() {
     this.canvas.addEventListener('mousemove', this.handleMouseMove);
     this.canvas.addEventListener('click', this.handleClick);
+    this.canvas.addEventListener('touchend', this.handleTouchEnd, { passive: false });
   }
 
   detach() {
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
     this.canvas.removeEventListener('click', this.handleClick);
+    this.canvas.removeEventListener('touchend', this.handleTouchEnd);
   }
 
   // ── rendering ─────────────────────────────────────────────────────────────
