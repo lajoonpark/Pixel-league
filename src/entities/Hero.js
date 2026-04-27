@@ -34,8 +34,10 @@ export class Hero {
     this.attackAnimStartMs = 0;
     // Set by combatSystem when the hero lands a hit; consumed by game.js to spawn the hit spark.
     this.pendingHitTarget = null;
-    // Ability slot data (Q / F / E / R).
+    // Ability slot data (Q / W / E / R).
     this.abilities = createHeroAbilities();
+    // Click-to-move target position in world coordinates (null = stationary).
+    this.targetPosition = null;
     // Last intentional movement direction; used by Dash and Power Shot.
     // Defaults to rightward (toward the enemy base) before the first input.
     this.lastMoveDir = { x: 1, y: 0 };

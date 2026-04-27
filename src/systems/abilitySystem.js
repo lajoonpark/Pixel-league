@@ -1,4 +1,4 @@
-// Ability system: defines hero abilities (Q/F/E/R) and their cast logic.
+// Ability system: defines hero abilities (Q/W/E/R) and their cast logic.
 // Each ability is a plain data object; cast logic is handled by pure functions
 // so the system is easy to extend with new hero kits.
 import { distanceSquared } from '../utils.js';
@@ -22,10 +22,10 @@ export function createHeroAbilities() {
       damage: 30,
     },
     {
-      // F – Dash: instant movement burst in the hero's last movement direction.
+      // W – Dash: instant movement burst in the hero's last movement direction.
       id: 'dash',
       name: 'Dash',
-      key: 'F',
+      key: 'W',
       cooldown: 8,
       currentCooldown: 0,
       castRange: 0,
@@ -135,7 +135,7 @@ function castSlash(hero, ability, entities, vfxCtx) {
   return true;
 }
 
-// F – Dash: teleports the hero a fixed distance in their last movement direction.
+// W – Dash: teleports the hero a fixed distance in their last movement direction.
 // Returns true if a valid direction exists, false if the hero has never moved.
 function castDash(hero, ability, vfxCtx) {
   const dir = hero.lastMoveDir;
