@@ -547,6 +547,33 @@ export class Renderer {
     this.ctx.fillText(text, x, y);
   }
 
+  // Draw a fading circle marker at a world position to show the movement target.
+  drawClickMarker(worldX, worldY, alpha) {
+    const { x, y } = this.camera.worldToScreen(worldX, worldY);
+    const ctx = this.ctx;
+    const sx = Math.round(x);
+    const sy = Math.round(y);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#44ff88';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Small cross in the centre.
+    ctx.beginPath();
+    ctx.moveTo(sx - 4, sy);
+    ctx.lineTo(sx + 4, sy);
+    ctx.moveTo(sx, sy - 4);
+    ctx.lineTo(sx, sy + 4);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   // ── Projectiles ───────────────────────────────────────────────────────────────
 
   // Draw a single hero-fired projectile.  Uses looping sprite-frame animation

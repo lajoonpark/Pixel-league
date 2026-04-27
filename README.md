@@ -21,17 +21,15 @@ Then open: `http://localhost:8000`
 
 ## Controls
 
-| Key | Action |
-|-----|--------|
-| WASD / Arrow Keys | Move hero |
+| Key / Input | Action |
+|-------------|--------|
+| Right Click | Move hero |
 | Space | Basic attack |
 | Q | Slash (instant melee damage) |
-| F | Dash (burst movement in current direction) |
+| W | Dash (burst movement in current direction) |
 | E | Energy Blast (fire projectile) |
 | R | Energy Burst (AoE damage around hero) |
 | R *(after game ends)* | Restart match |
-
-> **Note**: W is reserved for movement. Abilities use Q, F, E, and R only.
 
 ## Project structure
 

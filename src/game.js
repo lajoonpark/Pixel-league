@@ -36,11 +36,13 @@ export class Game {
     this.wasAttackPressed = false;
     // Tracks previous-frame pressed state for each ability key to enable
     // fresh-press detection (cast fires once per key-down, not while held).
-    this.wasAbilityPressed = { Q: false, F: false, E: false, R: false };
+    this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     // Live hero-fired projectiles (Power Shot).  Kept separate from entities.
     this.projectiles = [];
     this.state = GAME_STATES.menu;
     this.resultMessage = '';
+    // Click marker for visual movement feedback { x, y, spawnMs } or null.
+    this.clickMarker = null;
 
     this.menu = new Menu(canvas, () => this._startGame());
   }
@@ -94,7 +96,7 @@ export class Game {
     this.menu.detach();
     this.setupWorld();
     this.state = GAME_STATES.playing;
-    this.input.attach();
+    this.input.attach(this.canvas);
     this.camera.follow(this.hero);
   }
 
@@ -107,8 +109,10 @@ export class Game {
     this.effectSystem.effects = [];
     this.vfxSystem.effects = [];
     this.projectiles = [];
+    this.clickMarker = null;
     this.setupWorld();
     this.input.keys.clear();
+    this.input._rightClickThisFrame = false;
     this.wasAttackPressed = false;
     this.camera.follow(this.hero);
   }
@@ -172,6 +176,20 @@ export class Game {
 
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
+
+    // Process right-click to set hero movement target (click-to-move).
+    if (this.hero.alive && this.input.consumeRightClick()) {
+      const worldX = this.input.mouseX + this.camera.x;
+      const worldY = this.input.mouseY + this.camera.y;
+      // Clamp target to map bounds (accounting for hero half-size).
+      const hw = this.hero.width / 2;
+      const hh = this.hero.height / 2;
+      const clampedX = Math.max(this.map.x + hw, Math.min(this.map.x + this.map.width - hw, worldX));
+      const clampedY = Math.max(this.map.y + hh, Math.min(this.map.y + this.map.height - hh, worldY));
+      this.hero.targetPosition = { x: clampedX, y: clampedY };
+      this.clickMarker = { x: clampedX, y: clampedY, spawnMs: nowMs };
+    }
+
     this.updateHeroVelocity();
     const attackPressed = this.input.isAttackPressed();
     if (this.hero.alive && attackPressed && !this.wasAttackPressed) {
@@ -193,7 +211,7 @@ export class Game {
     // key never re-fires the ability.
     const ABILITY_KEY_CODES = [
       ['Q', 'KeyQ'],
-      ['F', 'KeyF'],
+      ['W', 'KeyW'],
       ['E', 'KeyE'],
       ['R', 'KeyR'],
     ];
@@ -259,24 +277,36 @@ export class Game {
     if (!this.hero.alive) {
       this.hero.vx = 0;
       this.hero.vy = 0;
+      this.hero.targetPosition = null;
       this.hero.isAttackRequested = false;
       return;
     }
 
-    const speed = this.hero.moveSpeed ?? CONFIG.hero.moveSpeed;
-    const move = this.input.getMoveIntent();
-    const magnitude = Math.hypot(move.x, move.y);
-    if (magnitude === 0) {
+    const target = this.hero.targetPosition;
+    if (!target) {
       this.hero.vx = 0;
       this.hero.vy = 0;
       return;
     }
 
-    const normalX = move.x / magnitude;
-    const normalY = move.y / magnitude;
+    const dx = target.x - this.hero.x;
+    const dy = target.y - this.hero.y;
+    const dist = Math.hypot(dx, dy);
+
+    // Stop when close enough to the target.
+    if (dist <= 3) {
+      this.hero.vx = 0;
+      this.hero.vy = 0;
+      this.hero.targetPosition = null;
+      return;
+    }
+
+    const speed = this.hero.moveSpeed ?? CONFIG.hero.moveSpeed;
+    const normalX = dx / dist;
+    const normalY = dy / dist;
     this.hero.vx = normalX * speed;
     this.hero.vy = normalY * speed;
-    // Persist direction so Dash and Power Shot can reference it even when idle.
+    // Persist direction so Dash and Power Shot can reference it.
     this.hero.lastMoveDir = { x: normalX, y: normalY };
   }
 
@@ -321,13 +351,14 @@ export class Game {
     this.hero.health = this.hero.maxHealth;
     this.hero.alive = true;
     this.hero.target = null;
+    this.hero.targetPosition = null;
     this.hero.isAttackRequested = false;
     this.hero.respawnAtMs = 0;
     this.hero.attackAnimPhase = 'idle';
     this.hero.attackAnimStartMs = 0;
     this.hero.pendingHitTarget = null;
     // Clear stale held-key flags so abilities don't auto-fire on respawn.
-    this.wasAbilityPressed = { Q: false, F: false, E: false, R: false };
+    this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
   }
 
   // Advance the hero's attack-animation phase based on elapsed time and spawn
@@ -388,9 +419,24 @@ export class Game {
     // Draw hero-fired projectiles on top of effects but below the HUD.
     this.renderer.drawProjectiles(this.projectiles);
 
-    this.renderer.drawText('Move hero: WASD / Arrow Keys', 12, 24);
+    // Draw click-to-move marker (fades over 500ms).
+    if (this.clickMarker) {
+      const MARKER_DURATION_MS = 500;
+      const elapsed = nowMs - this.clickMarker.spawnMs;
+      if (elapsed < MARKER_DURATION_MS) {
+        this.renderer.drawClickMarker(
+          this.clickMarker.x,
+          this.clickMarker.y,
+          1 - elapsed / MARKER_DURATION_MS
+        );
+      } else {
+        this.clickMarker = null;
+      }
+    }
+
+    this.renderer.drawText('Move: Right Click', 12, 24);
     this.renderer.drawText('Attack: Space', 12, 40);
-    this.renderer.drawText('Abilities: Q / F / E / R', 12, 56);
+    this.renderer.drawText('Abilities: Q / W / E / R', 12, 56);
     this.renderer.drawText('Restart: R (after match ends)', 12, 72);
     this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
     this.renderer.drawText(
