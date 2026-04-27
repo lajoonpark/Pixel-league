@@ -39,6 +39,8 @@ export class Game {
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     // Live hero-fired projectiles (Power Shot).  Kept separate from entities.
     this.projectiles = [];
+    // Deferred VFX spawns: [{spawnAtMs, type, x, y, frames, options}].
+    this.pendingVfxSpawns = [];
     this.state = GAME_STATES.menu;
     this.resultMessage = '';
     // Click marker for visual movement feedback { x, y, spawnMs } or null.
@@ -109,6 +111,7 @@ export class Game {
     this.effectSystem.effects = [];
     this.vfxSystem.effects = [];
     this.projectiles = [];
+    this.pendingVfxSpawns = [];
     this.clickMarker = null;
     this.setupWorld();
     this.input.keys.clear();
@@ -197,6 +200,14 @@ export class Game {
       // Start the diagonal sword animation.
       this.hero.attackAnimPhase = 'windUp';
       this.hero.attackAnimStartMs = nowMs;
+      // Spawn windup VFX at hero position.
+      const windupFrames = this.assets?.vfxFrames?.basic_windup ?? null;
+      this.vfxSystem.spawn('basic_windup', this.hero.x, this.hero.y, nowMs, windupFrames, {
+        frameDuration: 60,
+        width: 32,
+        height: 32,
+        color: '#ffb833',
+      });
     }
     this.wasAttackPressed = attackPressed;
 
@@ -242,6 +253,14 @@ export class Game {
         pixelSize: anim.sparkPixelSize,
         colors: anim.sparkColors,
       });
+      // Sprite-frame hit spark overlaid on the procedural effect.
+      const hitFrames = this.assets?.vfxFrames?.basic_hit ?? null;
+      this.vfxSystem.spawn('basic_hit', target.x, target.y, nowMs, hitFrames, {
+        frameDuration: 70,
+        width: 32,
+        height: 32,
+        color: '#ffb833',
+      });
     }
     // Spawn energy-blast projectiles for towers and bases that just fired.
     const blastCfg = CONFIG.energyBlast;
@@ -254,14 +273,61 @@ export class Game {
       const dist = Math.hypot(dx, dy);
       if (dist < 1) { continue; }
       const durationMs = (dist / blastCfg.speedPxPerSec) * 1000;
+
+      // Spawn tower charge VFX at the firing structure.
+      const chargeFrames = this.assets?.vfxFrames?.tower_charge ?? null;
+      this.vfxSystem.spawn('tower_charge', entity.x, entity.y, nowMs, chargeFrames, {
+        frameDuration: 80,
+        width: 48,
+        height: 48,
+        color: '#28d7ff',
+      });
+
+      // Procedural comet effect (always shown; acts as fallback for the projectile).
       this.effectSystem.spawn('energyBlast', entity.x, entity.y, nowMs, {
         durationMs,
         toX: tgt.x,
         toY: tgt.y,
         team: entity.team,
       });
+
+      // Visual-only sprite projectile that travels to the target.
+      const projFrames = this.assets?.vfxFrames?.tower_projectile ?? null;
+      const speed = blastCfg.speedPxPerSec;
+      this.projectiles.push({
+        alive: true,
+        x: entity.x,
+        y: entity.y,
+        vx: (dx / dist) * speed,
+        vy: (dy / dist) * speed,
+        team: entity.team,
+        damage: 0,
+        width: 48,
+        height: 48,
+        maxTravelDistance: dist,
+        traveledDistance: 0,
+        skipCollision: true,
+        rotation: Math.atan2(dy, dx),
+        color: '#28d7ff',
+        animFrames: projFrames,
+        animFrameDuration: 80,
+        animStartMs: nowMs,
+        onHit: null,
+      });
+
+      // Schedule tower_impact VFX to arrive at the target when the blast lands.
+      const impactFrames = this.assets?.vfxFrames?.tower_impact ?? null;
+      this.pendingVfxSpawns.push({
+        spawnAtMs: nowMs + durationMs,
+        type: 'tower_impact',
+        x: tgt.x,
+        y: tgt.y,
+        frames: impactFrames,
+        options: { frameDuration: 70, width: 48, height: 48, color: '#28d7ff' },
+      });
     }
     this._advanceHeroAttackAnim(nowMs);
+    this._processPendingVfx(nowMs);
     this.effectSystem.update(nowMs);
     this.vfxSystem.update(nowMs);
     movementSystem(this.entities, this.map, dtSeconds);
@@ -378,17 +444,40 @@ export class Game {
       hero.attackAnimPhase = 'swing';
     } else if (hero.attackAnimPhase === 'swing' && elapsed >= swingEnd) {
       hero.attackAnimPhase = 'followThrough';
-      // Spawn slash-arc crescent centred on the hero.
+      // Spawn procedural slash-arc crescent centred on the hero.
       this.effectSystem.spawn('slashArc', hero.x, hero.y, nowMs, {
         durationMs: anim.slashArcDurationMs,
         arcRadiusStart: anim.arcRadiusStart,
         arcRadiusEnd: anim.arcRadiusEnd,
+      });
+      // Sprite-frame slash overlaid on the procedural arc.
+      const slashFrames = this.assets?.vfxFrames?.basic_slash ?? null;
+      const dir = hero.lastMoveDir ?? { x: 1, y: 0 };
+      const slashX = hero.x + dir.x * 16;
+      const slashY = hero.y + dir.y * 16;
+      this.vfxSystem.spawn('basic_slash', slashX, slashY, nowMs, slashFrames, {
+        frameDuration: 70,
+        width: 48,
+        height: 48,
+        color: '#ffe18a',
       });
     } else if (hero.attackAnimPhase === 'followThrough' && elapsed >= followThroughEnd) {
       hero.attackAnimPhase = 'return';
     } else if (hero.attackAnimPhase === 'return' && elapsed >= returnEnd) {
       hero.attackAnimPhase = 'idle';
     }
+  }
+
+  // Fire any VFX spawns whose scheduled time has arrived.  Spawns are removed
+  // after triggering so the array stays compact.
+  _processPendingVfx(nowMs) {
+    this.pendingVfxSpawns = this.pendingVfxSpawns.filter((pv) => {
+      if (nowMs >= pv.spawnAtMs) {
+        this.vfxSystem.spawn(pv.type, pv.x, pv.y, nowMs, pv.frames, pv.options);
+        return false;
+      }
+      return true;
+    });
   }
 
   render(nowMs) {

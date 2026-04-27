@@ -128,6 +128,72 @@ Each animation is a numbered PNG sequence starting at `_0`:
 
 4. **Add a HUD icon** (optional): place `ui_<key>_icon.png` in `assets/ui/` and add its entry to `iconManifest` in `assetLoader.js`.
 
+---
+
+## Combat VFX (tower blast & basic attack)
+
+### Generating the VFX assets
+
+All combat VFX frames are produced programmatically with Python Pillow — no AI images, no external asset packs.
+
+```bash
+# Install Pillow (one-time)
+pip install Pillow
+
+# Regenerate all frames from the repo root
+python3 tools/generate_combat_vfx.py
+```
+
+### Where VFX assets live
+
+```
+assets/vfx/
+  tower_blast/
+    charge/      – tower_charge_01..04.png   (48×48, cyan orb forming)
+    projectile/  – tower_projectile_01..04.png (48×48, bolt facing right)
+    impact/      – tower_impact_01..05.png   (48×48, energy burst)
+  basic_attack/
+    slash/       – basic_slash_01..05.png    (48×48, crescent arc)
+    hit/         – basic_hit_01..04.png      (32×32, star spark)
+    windup/      – basic_windup_01..03.png   (32×32, subtle arc flash)
+```
+
+### VFX naming convention for future effects
+
+VFX frame sequences use **1-indexed**, zero-padded filenames:
+
+```
+<vfx_key>_01.png  <vfx_key>_02.png  …  <vfx_key>_NN.png
+```
+
+Register new sequences in `src/assets/assetLoader.js` under `vfxManifest`:
+
+```js
+['my_vfx_key', 'assets/vfx/<folder>', 'my_vfx_key', frameCount],
+```
+
+Load them in game code via `this.assets?.vfxFrames?.my_vfx_key`.
+
+The helper `loadFrameSequence(basePath, prefix, count)` is exported from `assetLoader.js` for use elsewhere.
+
+### How tower blast animations work
+
+1. **Charge** – when a tower's attack cooldown expires and it fires, a `tower_charge` sprite-frame animation plays at the tower's world position (4 frames, ~80 ms each).
+2. **Projectile** – simultaneously a visual-only projectile with `tower_projectile` sprite frames is added to the projectile pool.  It travels at `energyBlast.speedPxPerSec` toward the target with `skipCollision: true` (no extra damage) and is rotated in the travel direction.  The existing procedural comet effect still plays underneath as a fallback.
+3. **Impact** – a deferred `tower_impact` VFX spawn is scheduled for the moment the projectile arrives at the target (travel distance / speed).  It plays a 5-frame blue energy burst at the target's position.
+
+Damage itself is applied instantly by `combatSystem.js` (unchanged behaviour).
+
+### How basic attack animations work
+
+| Event | VFX spawned | Location |
+|-------|-------------|----------|
+| Space pressed (wind-up starts) | `basic_windup` (3 frames, 32×32) | Hero centre |
+| Swing phase ends → follow-through | `basic_slash` (5 frames, 48×48) | 16 px ahead of hero in last-move direction |
+| Damage lands (`pendingHitTarget`) | `basic_hit` (4 frames, 32×32) | Target centre |
+
+All sprite-frame VFX are drawn by `vfxSystem` / `renderer.drawVfxEffects()` with `imageSmoothingEnabled = false` for crisp pixel art.  If any PNG files are missing, a coloured placeholder rectangle is drawn and a warning is logged to the console — the game never crashes.
+
 ## Notes
 
 - `main.js` bootstraps the game and pre-loads all ability assets before the first frame.

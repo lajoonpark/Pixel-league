@@ -41,6 +41,10 @@ export function updateProjectiles(projectiles, entities, dtSeconds, nowMs = 0) {
       continue;
     }
 
+    // Visual-only projectiles skip collision entirely; they travel their full
+    // maxTravelDistance and expire without applying damage.
+    if (proj.skipCollision) { continue; }
+
     // Check for a hit against every hittable enemy entity.  The projectile is
     // consumed on the first hit so it cannot chain through multiple targets.
     for (const entity of entities) {
