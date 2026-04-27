@@ -3,6 +3,11 @@ export const GAME_STATES = {
   menu: 'menu',
   playing: 'playing',
   gameOver: 'gameOver',
+  // Multiplayer states
+  joinRoom: 'joinRoom',           // Room code entry screen
+  roomLobbyHost: 'roomLobbyHost', // Host waiting in room
+  roomLobbyClient: 'roomLobbyClient', // Client waiting in room
+  playingMultiplayer: 'playingMultiplayer', // Multiplayer match in progress
 };
 
 export const CONFIG = {
