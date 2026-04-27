@@ -40,6 +40,7 @@ export class Game {
     // fresh-press detection (targeting mode entered once per key-down).
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     this.wasEscapePressed = false;
+    this.wasFPressed = false;
     // Live hero-fired projectiles (Power Shot).  Kept separate from entities.
     this.projectiles = [];
     // Deferred VFX spawns: [{spawnAtMs, type, x, y, frames, options}].
@@ -129,6 +130,7 @@ export class Game {
     this.targetingSystem.cancel();
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     this.wasEscapePressed = false;
+    this.wasFPressed = false;
     this.mobileControls.reset();
     this.camera.follow(this.hero);
   }
@@ -197,12 +199,18 @@ export class Game {
     const mouseWorldX = this.input.mouseX + this.camera.x;
     const mouseWorldY = this.input.mouseY + this.camera.y;
 
-    // ── Escape: cancel targeting mode ────────────────────────────────────────
+    // ── Escape / F: cancel targeting mode ───────────────────────────────────
     const escapePressed = this.input.isPressed('Escape');
     if (escapePressed && !this.wasEscapePressed) {
       this.targetingSystem.cancel();
     }
     this.wasEscapePressed = escapePressed;
+
+    const fPressed = this.input.isPressed('KeyF');
+    if (fPressed && !this.wasFPressed) {
+      this.targetingSystem.cancel();
+    }
+    this.wasFPressed = fPressed;
 
     // ── Ability key presses: enter targeting mode ─────────────────────────────
     const ABILITY_KEY_CODES = [
@@ -275,12 +283,8 @@ export class Game {
       }
     }
 
-    // ── Right click: cancel targeting, then move ──────────────────────────────
+    // ── Right click: move (does NOT cancel ability targeting) ────────────────
     if (this.hero.alive && this.input.consumeRightClick()) {
-      // Cancel any active targeting mode first.
-      this.targetingSystem.cancel();
-
-      // Then apply click-to-move.
       const hw = this.hero.width / 2;
       const hh = this.hero.height / 2;
       const clampedX = Math.max(this.map.x + hw, Math.min(this.map.x + this.map.width - hw, mouseWorldX));
@@ -574,6 +578,7 @@ export class Game {
     // Clear stale held-key flags so abilities don't auto-fire on respawn.
     this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
     this.wasEscapePressed = false;
+    this.wasFPressed = false;
     this.targetingSystem.cancel();
   }
 
@@ -699,24 +704,23 @@ export class Game {
     // ── HUD text (desktop-style controls, hidden on touch devices) ───────────
     const selectedKey = this.targetingSystem.getSelectedKey();
     if (!this.mobileControls.isMobile) {
-      this.renderer.drawText('Move: Right Click', 12, 24);
-      this.renderer.drawText('Attack: Left Click', 12, 40);
+      this.renderer.drawText('Move: Right Click  |  Attack: Left Click  |  Q/W/E/R = Ability  |  F/Esc = Cancel', 12, 24);
       if (selectedKey) {
         this.renderer.drawText(
-          `Targeting: ${selectedKey} — Left Click to cast, Right Click / Esc to cancel`,
+          `Targeting: ${selectedKey} — Click to cast, F/Esc to cancel  (Right-click moves)`,
           12,
-          56,
+          40,
           { font: CONFIG.ui.font, color: '#ffdc3c' }
         );
       } else {
-        this.renderer.drawText('Q / W / E / R = Select ability', 12, 56);
+        this.renderer.drawText('Q / W / E / R = Select ability  |  F / Esc = Cancel ability', 12, 40);
       }
-      this.renderer.drawText('Restart: R (after match ends)', 12, 72);
-      this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 88);
+      this.renderer.drawText('Restart: R (after match ends)', 12, 56);
+      this.renderer.drawText(`Entities: ${this.entities.length}`, 12, 72);
       this.renderer.drawText(
         `Hero: ${this.hero.x.toFixed(1)}, ${this.hero.y.toFixed(1)}  FPS: ${this.fps.toFixed(0)}`,
         12,
-        104,
+        88,
         { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
       );
       if (!this.hero.alive) {
@@ -724,7 +728,7 @@ export class Game {
         this.renderer.drawText(
           `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
           12,
-          120,
+          104,
           { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
         );
       }
