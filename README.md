@@ -25,14 +25,17 @@ Then open: `http://localhost:8000`
 
 | Key / Input | Action |
 |-------------|--------|
-| Right Click | Move hero / cancel ability targeting |
+| Right Click | Move hero |
 | Left Click | Basic attack (or confirm selected ability) |
 | Q | Select Slash ability (then left click to cast) |
 | W | Select Dash ability (then left click to cast) |
 | E | Select Energy Blast ability (then left click to cast) |
 | R | Select Energy Burst ability (then left click to cast) |
+| F | Cancel ability targeting |
 | Esc | Cancel ability targeting |
 | R *(after game ends)* | Restart match |
+
+> **Tip:** You can move and aim abilities at the same time — right-click to reposition while keeping an ability selected.
 
 ### Mobile Controls (landscape recommended)
 
@@ -55,8 +58,8 @@ Pressing **Q / W / E / R** enters that ability's *targeting mode*:
 - A range circle appears around the hero showing cast range.
 - A hit-area preview appears near the mouse cursor (circle, destination marker, or AoE).
 - **Left click** confirms the cast toward the mouse position and exits targeting mode.
-- **Right click** cancels targeting mode and moves the hero instead.
-- **Esc** cancels targeting without moving.
+- **Right click** moves the hero **without** cancelling targeting — you can reposition while aiming.
+- **F** or **Esc** cancels targeting without moving.
 - Pressing a *different* ability key while in targeting mode switches to that ability.
 - The selected ability slot in the HUD is highlighted in gold with "ACTIVE" status.
 
