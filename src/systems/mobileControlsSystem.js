@@ -29,6 +29,10 @@ export const MOBILE_LAYOUT = {
   cancel: { cx: 878, cy: 78, radius: 52 },
 };
 
+// Multiplier applied to button radii for touch hit-testing.
+// Expands the tap target beyond the visible circle for comfort.
+const HIT_AREA_MULTIPLIER = 1.25;
+
 // ── MobileControls ────────────────────────────────────────────────────────────
 
 export class MobileControls {
@@ -125,7 +129,7 @@ export class MobileControls {
   // Returns the ability key if the point is inside an ability button, else null.
   _inAbilityButton(cx, cy) {
     for (const btn of MOBILE_LAYOUT.abilities) {
-      if (this._dist(cx, cy, btn.cx, btn.cy) <= btn.radius * 1.25) {
+      if (this._dist(cx, cy, btn.cx, btn.cy) <= btn.radius * HIT_AREA_MULTIPLIER) {
         return btn.key;
       }
     }
@@ -134,7 +138,7 @@ export class MobileControls {
 
   _inAttackButton(cx, cy) {
     const a = MOBILE_LAYOUT.attack;
-    return this._dist(cx, cy, a.cx, a.cy) <= a.radius * 1.25;
+    return this._dist(cx, cy, a.cx, a.cy) <= a.radius * HIT_AREA_MULTIPLIER;
   }
 
   _inCancelZone(cx, cy) {

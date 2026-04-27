@@ -252,8 +252,11 @@ export class Game {
       }
 
       // Attack button tapped: find nearest enemy within a comfortable radius.
+      // The search extends beyond the hero's attack range so the hero will walk
+      // to nearby enemies automatically (same behaviour as desktop click-to-attack).
       if (this.mobileControls.attackRequested) {
-        const MOBILE_ATK_SEARCH = this.hero.attackRange + 120;
+        const MOBILE_ATTACK_SEARCH_EXTENSION = 120; // world-px buffer added to attack range
+        const MOBILE_ATK_SEARCH = this.hero.attackRange + MOBILE_ATTACK_SEARCH_EXTENSION;
         const enemy = findEnemyNearPoint(
           this.entities, this.hero.x, this.hero.y, MOBILE_ATK_SEARCH, this.hero.team
         );

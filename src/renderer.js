@@ -1,4 +1,6 @@
 // Renderer wraps low-level canvas drawing operations.
+import { MOBILE_LAYOUT } from './systems/mobileControlsSystem.js';
+
 export class Renderer {
   constructor(canvas, camera, config) {
     this.canvas = canvas;
@@ -952,15 +954,11 @@ export class Renderer {
   // selectedKey    – active targeting key ('Q'/'W'/'E'/'R') or null.
   drawMobileHUD(mobileControls, hero, selectedKey) {
     const ctx = this.ctx;
-    const J = { cx: 130, cy: 440, baseRadius: 65, thumbRadius: 26 };
-    const ATK = { cx: 860, cy: 458, radius: 42 };
-    const ABILITIES = [
-      { key: 'Q', cx: 772, cy: 408, radius: 35 },
-      { key: 'W', cx: 848, cy: 385, radius: 35 },
-      { key: 'E', cx: 772, cy: 464, radius: 35 },
-      { key: 'R', cx: 898, cy: 400, radius: 40 },
-    ];
-    const CANCEL = { cx: 878, cy: 78, radius: 52 };
+    // Use the single-source layout from mobileControlsSystem.js.
+    const J = MOBILE_LAYOUT.joystick;
+    const ATK = MOBILE_LAYOUT.attack;
+    const ABILITIES = MOBILE_LAYOUT.abilities;
+    const CANCEL = MOBILE_LAYOUT.cancel;
 
     const abilities = hero?.abilities ?? [];
     const isAiming = mobileControls.activeMobileAbility !== null;
