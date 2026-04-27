@@ -112,30 +112,25 @@ function castSlash(hero, ability, entities, vfxCtx) {
   const target = findNearestEnemy(hero, entities, ability.castRange);
   if (!target) { return false; }
 
-  if (vfxCtx) {
-    const { vfxSystem, assets, nowMs } = vfxCtx;
-    const f = assets?.frames;
-    // Slash arc animation at the hero's position.
-    vfxSystem.spawn('q_slash_arc', hero.x, hero.y, nowMs,
-      f?.['q_slash_arc'] ?? null,
-      { frameDuration: 60, width: 80, height: 80, color: '#ffffff' }
-    );
-  }
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Slash arc animation at the hero's position.
+  vfxSystem?.spawn('q_slash_arc', hero.x, hero.y, nowMs,
+    f?.['q_slash_arc'] ?? null,
+    { frameDuration: 60, width: 80, height: 80, color: '#ffffff' }
+  );
 
   target.health = Math.max(0, target.health - ability.damage);
   if (target.health <= 0 && typeof target.alive === 'boolean') {
     target.alive = false;
   }
 
-  if (vfxCtx) {
-    const { vfxSystem, assets, nowMs } = vfxCtx;
-    const f = assets?.frames;
-    // Hit spark at the struck target's position.
-    vfxSystem.spawn('q_slash_spark', target.x, target.y, nowMs,
-      f?.['q_slash_spark'] ?? null,
-      { frameDuration: 55, width: 48, height: 48, color: '#ffee55' }
-    );
-  }
+  // Hit spark at the struck target's position.
+  vfxSystem?.spawn('q_slash_spark', target.x, target.y, nowMs,
+    f?.['q_slash_spark'] ?? null,
+    { frameDuration: 55, width: 48, height: 48, color: '#ffee55' }
+  );
 
   return true;
 }
@@ -152,32 +147,31 @@ function castDash(hero, ability, vfxCtx) {
   hero.x += (dir.x / mag) * ability.distance;
   hero.y += (dir.y / mag) * ability.distance;
 
-  if (vfxCtx) {
-    const { vfxSystem, assets, nowMs } = vfxCtx;
-    const f = assets?.frames;
-    // Dust at dash origin.
-    vfxSystem.spawn('f_dash_start', startX, startY, nowMs,
-      f?.['f_dash_start'] ?? null,
-      { frameDuration: 60, width: 48, height: 48, color: '#aaddff' }
-    );
-    // Trail puffs along the dash path (3 intermediate points).
-    const trailSteps = 3;
-    for (let i = 1; i <= trailSteps; i++) {
-      const t = i / (trailSteps + 1);
-      vfxSystem.spawn('f_dash_trail',
-        startX + (hero.x - startX) * t,
-        startY + (hero.y - startY) * t,
-        nowMs,
-        f?.['f_dash_trail'] ?? null,
-        { frameDuration: 50, width: 40, height: 40, color: '#88ccff' }
-      );
-    }
-    // Dust at dash destination.
-    vfxSystem.spawn('f_dash_end', hero.x, hero.y, nowMs,
-      f?.['f_dash_end'] ?? null,
-      { frameDuration: 55, width: 48, height: 48, color: '#aaddff' }
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Dust at dash origin.
+  vfxSystem?.spawn('f_dash_start', startX, startY, nowMs,
+    f?.['f_dash_start'] ?? null,
+    { frameDuration: 60, width: 48, height: 48, color: '#aaddff' }
+  );
+  // Trail puffs along the dash path (3 intermediate points).
+  const trailSteps = 3;
+  for (let i = 1; i <= trailSteps; i++) {
+    const t = i / (trailSteps + 1);
+    vfxSystem?.spawn('f_dash_trail',
+      startX + (hero.x - startX) * t,
+      startY + (hero.y - startY) * t,
+      nowMs,
+      f?.['f_dash_trail'] ?? null,
+      { frameDuration: 50, width: 40, height: 40, color: '#88ccff' }
     );
   }
+  // Dust at dash destination.
+  vfxSystem?.spawn('f_dash_end', hero.x, hero.y, nowMs,
+    f?.['f_dash_end'] ?? null,
+    { frameDuration: 55, width: 48, height: 48, color: '#aaddff' }
+  );
 
   return true;
 }
@@ -207,19 +201,20 @@ function castPowerShot(hero, ability, vfxCtx) {
     color: '#ffdd44',
   };
 
-  if (vfxCtx) {
-    const { vfxSystem, assets, nowMs } = vfxCtx;
-    const f = assets?.frames;
-    // Charge effect at the hero's cast position.
-    vfxSystem.spawn('e_blast_charge', hero.x, hero.y, nowMs,
-      f?.['e_blast_charge'] ?? null,
-      { frameDuration: 70, width: 48, height: 48, color: '#44ff88' }
-    );
-    // Attach looping sprite frames to the projectile for in-flight animation.
-    proj.animFrames = f?.['e_blast_projectile'] ?? null;
-    proj.animFrameDuration = 80;
-    proj.animStartMs = nowMs;
-    // On-hit callback spawns the impact explosion VFX.
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Charge effect at the hero's cast position.
+  vfxSystem?.spawn('e_blast_charge', hero.x, hero.y, nowMs,
+    f?.['e_blast_charge'] ?? null,
+    { frameDuration: 70, width: 48, height: 48, color: '#44ff88' }
+  );
+  // Attach looping sprite frames to the projectile for in-flight animation.
+  proj.animFrames = f?.['e_blast_projectile'] ?? null;
+  proj.animFrameDuration = 80;
+  proj.animStartMs = nowMs;
+  // On-hit callback spawns the impact explosion VFX.
+  if (vfxSystem) {
     proj.onHit = (hitX, hitY, hitNowMs) => {
       vfxSystem.spawn('e_blast_impact', hitX, hitY, hitNowMs,
         f?.['e_blast_impact'] ?? null,
@@ -244,27 +239,26 @@ function castSmash(hero, ability, entities, vfxCtx) {
     }
   }
 
-  if (vfxCtx) {
-    const { vfxSystem, assets, nowMs } = vfxCtx;
-    const f = assets?.frames;
-    // Charge burst at the hero's position.
-    vfxSystem.spawn('r_burst_charge', hero.x, hero.y, nowMs,
-      f?.['r_burst_charge'] ?? null,
-      { frameDuration: 75, width: 80, height: 80, color: '#ff44ff' }
-    );
-    // Explosion on each struck target.
-    for (const target of targets) {
-      vfxSystem.spawn('r_burst_explosion', target.x, target.y, nowMs,
-        f?.['r_burst_explosion'] ?? null,
-        { frameDuration: 70, width: 80, height: 80, color: '#ff4400' }
-      );
-    }
-    // Fading aftershock ground ring centred on the hero.
-    vfxSystem.spawn('r_burst_aftershock', hero.x, hero.y, nowMs,
-      f?.['r_burst_aftershock'] ?? null,
-      { frameDuration: 90, width: 120, height: 120, color: '#ffaa00' }
+  const { vfxSystem, assets, nowMs } = vfxCtx ?? {};
+  const f = assets?.frames;
+
+  // Charge burst at the hero's position.
+  vfxSystem?.spawn('r_burst_charge', hero.x, hero.y, nowMs,
+    f?.['r_burst_charge'] ?? null,
+    { frameDuration: 75, width: 80, height: 80, color: '#ff44ff' }
+  );
+  // Explosion on each struck target.
+  for (const target of targets) {
+    vfxSystem?.spawn('r_burst_explosion', target.x, target.y, nowMs,
+      f?.['r_burst_explosion'] ?? null,
+      { frameDuration: 70, width: 80, height: 80, color: '#ff4400' }
     );
   }
+  // Fading aftershock ground ring centred on the hero.
+  vfxSystem?.spawn('r_burst_aftershock', hero.x, hero.y, nowMs,
+    f?.['r_burst_aftershock'] ?? null,
+    { frameDuration: 90, width: 120, height: 120, color: '#ffaa00' }
+  );
 
   return true;
 }

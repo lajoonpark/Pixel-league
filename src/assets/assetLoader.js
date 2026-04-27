@@ -34,7 +34,6 @@ export async function loadAbilityAssets() {
   const frameManifest = [
     ['q_slash_arc',        'assets/abilities/q_slash/q_slash_arc',        5],
     ['q_slash_spark',      'assets/abilities/q_slash/q_slash_spark',      4],
-    ['q_slash_ring',       'assets/abilities/q_slash/q_slash_ring',       4],
     ['f_dash_start',       'assets/abilities/f_dash/f_dash_start',        3],
     ['f_dash_trail',       'assets/abilities/f_dash/f_dash_trail',        5],
     ['f_dash_end',         'assets/abilities/f_dash/f_dash_end',          4],

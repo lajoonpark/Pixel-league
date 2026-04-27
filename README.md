@@ -97,7 +97,6 @@ Each animation is a numbered PNG sequence starting at `_0`:
 |---------|--------------|--------|-------------|
 | Q Slash | `q_slash_arc` | 5 | Slash arc sweep at hero |
 | Q Slash | `q_slash_spark` | 4 | Hit spark at target |
-| Q Slash | `q_slash_ring` | 4 | Impact ring (unused by default) |
 | F Dash | `f_dash_start` | 3 | Dust at dash origin |
 | F Dash | `f_dash_trail` | 5 | Trail puffs along dash path |
 | F Dash | `f_dash_end` | 4 | Dust at dash destination |
