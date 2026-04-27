@@ -290,6 +290,67 @@ Damage itself is applied instantly by `combatSystem.js` (unchanged behaviour).
 
 All sprite-frame VFX are drawn by `vfxSystem` / `renderer.drawVfxEffects()` with `imageSmoothingEnabled = false` for crisp pixel art.  If any PNG files are missing, a coloured placeholder rectangle is drawn and a warning is logged to the console — the game never crashes.
 
+---
+
+## Multiplayer Setup (Vercel + Supabase Realtime)
+
+The game supports 2-player realtime multiplayer using **Supabase Realtime** for room and player sync.  No custom backend server is needed — the frontend communicates directly with Supabase from the browser.
+
+### 1. Create a Supabase Project
+
+1. Go to [https://app.supabase.com](https://app.supabase.com) and create a free project.
+2. After the project is ready, go to **Settings → API**.
+3. Copy your **Project URL** and **anon public** key.
+
+> ⚠️ Only use the `anon` / `public` key.  Never paste the `service_role` key into client code.
+
+### 2. Add Your Credentials
+
+Open `src/config/supabaseConfig.js` and fill in the two values:
+
+```js
+export const SUPABASE_URL = 'https://your-project.supabase.co';
+export const SUPABASE_ANON_KEY = 'your-anon-key-here';
+```
+
+### 3. Deploy to Vercel
+
+1. Push your repository to GitHub.
+2. Import the repo in [Vercel](https://vercel.com).
+3. No build command needed — set the output directory to `.` (repository root).
+4. Deploy.
+
+The `Create Room` and `Join Room` buttons will be enabled automatically once the credentials are set.
+
+### Multiplayer Controls
+
+| Action | Desktop | Mobile |
+|--------|---------|--------|
+| Move | Right click | Left joystick |
+| Basic attack | Left click on enemy | ATK button |
+| Abilities | Q / W / E / R | Hold ability button |
+| Cancel ability | F or Esc | Drag to CANCEL zone |
+
+### How Rooms Work
+
+| Step | Description |
+|------|-------------|
+| **Create Room** | Generates a 6-character room code.  Creator is Player 1 (blue). |
+| **Join Room** | Enter the code shared by the host. Joiner is Player 2 (red). |
+| **Start Game** | Host clicks *Start Game* when 2 players are present. |
+| **Leave / Disband** | Either player can leave; host disbanding returns both players to the menu. |
+
+### Multiplayer Notes
+
+- **Prototype client-sync only** — no server-authoritative gameplay.  Each client simulates AI independently (towers, minions, bases).
+- **Max 2 players** per room.
+- **Player 1** = blue hero.  **Player 2** = red hero.
+- Player positions, health, and ability/attack events are broadcast at ~20 Hz via Supabase Realtime Broadcast.
+- Remote hero position is smoothly interpolated between received packets.
+- If Supabase credentials are missing, multiplayer buttons are hidden and single-player still works normally.
+
+---
+
 ## Notes
 
 - `main.js` bootstraps the game and pre-loads all ability assets before the first frame.

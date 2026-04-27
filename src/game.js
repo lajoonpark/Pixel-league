@@ -19,6 +19,14 @@ import { castAbility, updateAbilityCooldowns } from './systems/abilitySystem.js'
 import { updateProjectiles } from './systems/projectileSystem.js';
 import { TargetingSystem, TARGETING_STATE } from './systems/targetingSystem.js';
 import { MobileControls } from './systems/mobileControlsSystem.js';
+import { MultiplayerService } from './services/multiplayerService.js';
+import { RoomScreen } from './ui/roomScreen.js';
+
+// Pixel colors for each player slot.
+const PLAYER_COLORS = { 1: '#4aa8ff', 2: '#ff7a7a' };
+
+// Rate-limit for broadcasting own state (milliseconds between sends ≈ 20 Hz).
+const MP_TICK_RATE_MS = 50;
 
 export class Game {
   constructor(canvas, assets = { frames: {}, icons: {} }) {
@@ -53,7 +61,32 @@ export class Game {
     // Mobile touch controls (attached on play start if device supports touch).
     this.mobileControls = new MobileControls(canvas);
 
-    this.menu = new Menu(canvas, () => this._startGame());
+    // ── Multiplayer ─────────────────────────────────────────────────────────
+    this.multiplayer = new MultiplayerService();
+    // Remote hero: plain object rendered from network state (not in entities[]).
+    this.remoteHero = null;
+    // Interpolation target position received from the last PLAYER_STATE packet.
+    this._remoteHeroTarget = { x: 0, y: 0 };
+    // Accumulator (ms) for rate-limited state broadcasts.
+    this._mpTickAccum = 0;
+    this._setupMultiplayerCallbacks();
+
+    // ── Room UI ─────────────────────────────────────────────────────────────
+    this.roomScreen = new RoomScreen(canvas, {
+      onJoin: (code) => this._onJoinRoomWithCode(code),
+      onBack: () => this._returnToMenu(),
+      onStartGame: () => this._onHostStartGame(),
+      onDisband: () => this._onHostDisband(),
+      onLeave: () => this._onClientLeave(),
+    });
+
+    // ── Menu ─────────────────────────────────────────────────────────────────
+    this.menu = new Menu(
+      canvas,
+      () => this._startGame(),
+      () => this._onCreateRoom(),
+      () => this._onJoinRoom()
+    );
   }
 
   setupWorld() {
@@ -110,6 +143,309 @@ export class Game {
       this.mobileControls.attach();
     }
     this.camera.follow(this.hero);
+  }
+
+  // ── Multiplayer: callbacks ─────────────────────────────────────────────────
+
+  _setupMultiplayerCallbacks() {
+    const mp = this.multiplayer;
+
+    mp.onPresenceChange = (count, players) => {
+      if (
+        this.state === GAME_STATES.roomLobbyHost
+        || this.state === GAME_STATES.roomLobbyClient
+      ) {
+        this.roomScreen.updateData({ playerCount: count });
+      }
+    };
+
+    mp.onRoomDisbanded = (reason) => {
+      this.multiplayer.leaveRoom().catch(() => {});
+      if (
+        this.state === GAME_STATES.roomLobbyClient
+        || this.state === GAME_STATES.playingMultiplayer
+      ) {
+        this._returnToMenu(reason);
+      }
+    };
+
+    mp.onStartGame = () => {
+      if (this.state === GAME_STATES.roomLobbyClient) {
+        this._startMultiplayerGame();
+      }
+    };
+
+    mp.onPlayerState = (payload) => {
+      this._onRemotePlayerState(payload);
+    };
+
+    mp.onAbilityCast = (payload) => {
+      this._onRemoteAbilityCast(payload);
+    };
+
+    mp.onBasicAttack = (payload) => {
+      this._onRemoteBasicAttack(payload);
+    };
+
+    mp.onConnectionError = (err) => {
+      console.error('[MP]', err);
+      if (this.state === GAME_STATES.roomLobbyHost || this.state === GAME_STATES.roomLobbyClient) {
+        this.roomScreen.updateData({ errorMessage: `Connection error: ${err.message}` });
+      }
+    };
+  }
+
+  // ── Multiplayer: menu button handlers ─────────────────────────────────────
+
+  async _onCreateRoom() {
+    this.menu.detach();
+    this.roomScreen.attach();
+    this.roomScreen.setMode('lobbyHost', { roomCode: '……', playerCount: 0 });
+    this.state = GAME_STATES.roomLobbyHost;
+
+    try {
+      const code = await this.multiplayer.createRoom();
+      this.roomScreen.setMode('lobbyHost', { roomCode: code, playerCount: 1 });
+    } catch (err) {
+      this.roomScreen.updateData({ errorMessage: `Could not create room: ${err.message}` });
+    }
+  }
+
+  _onJoinRoom() {
+    this.menu.detach();
+    this.roomScreen.attach();
+    this.roomScreen.setMode('joinInput');
+    this.state = GAME_STATES.joinRoom;
+  }
+
+  async _onJoinRoomWithCode(code) {
+    this.roomScreen.updateData({ errorMessage: '', statusMessage: 'Connecting…' });
+
+    try {
+      await this.multiplayer.joinRoom(code);
+      const count = this.multiplayer.getPlayerCount();
+      this.roomScreen.setMode('lobbyClient', { roomCode: code, playerCount: count });
+      this.state = GAME_STATES.roomLobbyClient;
+    } catch (err) {
+      this.roomScreen.updateData({ errorMessage: err.message, statusMessage: '' });
+    }
+  }
+
+  // ── Multiplayer: room action handlers ─────────────────────────────────────
+
+  async _onHostStartGame() {
+    if (this.multiplayer.getPlayerCount() < 2) return;
+    try {
+      await this.multiplayer.broadcastStartGame();
+      this._startMultiplayerGame();
+    } catch (err) {
+      this.roomScreen.updateData({ errorMessage: `Start failed: ${err.message}` });
+    }
+  }
+
+  async _onHostDisband() {
+    try {
+      await this.multiplayer.broadcastRoomDisbanded();
+    } catch { /* swallow */ }
+    await this.multiplayer.leaveRoom();
+    this._returnToMenu();
+  }
+
+  async _onClientLeave() {
+    await this.multiplayer.leaveRoom();
+    this._returnToMenu();
+  }
+
+  // ── Multiplayer: game start ───────────────────────────────────────────────
+
+  _startMultiplayerGame() {
+    this.roomScreen.detach();
+
+    // Reset all game state.
+    this.entities = [];
+    this.effectSystem.effects = [];
+    this.vfxSystem.effects = [];
+    this.projectiles = [];
+    this.pendingVfxSpawns = [];
+    this.clickMarker = null;
+    this.spawnSystem.reset();
+    this.waveCount = 0;
+    this.resultMessage = '';
+
+    this.setupWorld();
+
+    const mp = this.multiplayer;
+    const isHost = mp.isHost;
+    const localNumber = mp.myPlayerNumber;  // 1 or 2
+
+    // Set local hero color and position based on player slot.
+    this.hero.color = PLAYER_COLORS[localNumber];
+    this.hero.team = isHost ? 'blue' : 'red';
+
+    if (!isHost) {
+      // Player 2 spawns slightly offset so both heroes aren't stacked.
+      const sp = this.getAlliedHeroSpawnPoint();
+      this.hero.x = sp.x + 40;
+      this.hero.y = sp.y + 20;
+    }
+
+    // Create the remote hero object (rendered separately, not in entities[]).
+    const remoteNumber = isHost ? 2 : 1;
+    this.remoteHero = {
+      type: 'hero',
+      renderType: 'hero',
+      spriteId: 'hero',
+      team: remoteNumber === 1 ? 'blue' : 'red',
+      color: PLAYER_COLORS[remoteNumber],
+      x: this.hero.x + 5,
+      y: this.hero.y + 5,
+      width: CONFIG.hero.width,
+      height: CONFIG.hero.height,
+      health: CONFIG.hero.health,
+      maxHealth: CONFIG.hero.health,
+      alive: true,
+      showRangeCircle: false,
+      attackAnimPhase: 'idle',
+      attackAnimStartMs: 0,
+      lastMoveDir: { x: 1, y: 0 },
+    };
+    this._remoteHeroTarget = { x: this.remoteHero.x, y: this.remoteHero.y };
+    this._mpTickAccum = 0;
+
+    this.state = GAME_STATES.playingMultiplayer;
+    this.input.attach(this.canvas);
+    if (this.mobileControls.isMobile) {
+      this.mobileControls.attach();
+    }
+    this.camera.follow(this.hero);
+
+    this.wasAbilityPressed = { Q: false, W: false, E: false, R: false };
+    this.wasEscapePressed = false;
+    this.wasFPressed = false;
+    this.targetingSystem.cancel();
+  }
+
+  // ── Multiplayer: network send helpers ─────────────────────────────────────
+
+  _broadcastPlayerState() {
+    const h = this.hero;
+    this.multiplayer.broadcastPlayerState({
+      x: h.x,
+      y: h.y,
+      health: h.health,
+      maxHealth: h.maxHealth,
+      alive: h.alive,
+      lastMoveDir: h.lastMoveDir,
+      attackAnimPhase: h.attackAnimPhase,
+    });
+  }
+
+  // ── Multiplayer: receive handlers ─────────────────────────────────────────
+
+  _onRemotePlayerState(payload) {
+    if (!this.remoteHero) return;
+    // Update interpolation target (smooth movement).
+    if (typeof payload.x === 'number') this._remoteHeroTarget.x = payload.x;
+    if (typeof payload.y === 'number') this._remoteHeroTarget.y = payload.y;
+    if (typeof payload.health === 'number') this.remoteHero.health = payload.health;
+    if (typeof payload.maxHealth === 'number') this.remoteHero.maxHealth = payload.maxHealth;
+    if (typeof payload.alive === 'boolean') this.remoteHero.alive = payload.alive;
+    if (payload.lastMoveDir) this.remoteHero.lastMoveDir = payload.lastMoveDir;
+    // Sync attack animation phase for visual feedback.
+    if (payload.attackAnimPhase && payload.attackAnimPhase !== this.remoteHero.attackAnimPhase) {
+      this.remoteHero.attackAnimPhase = payload.attackAnimPhase;
+      if (payload.attackAnimPhase === 'windUp') {
+        this.remoteHero.attackAnimStartMs = this.lastFrameAt;
+      }
+    }
+  }
+
+  _onRemoteAbilityCast(payload) {
+    if (!this.remoteHero) return;
+    const nowMs = this.lastFrameAt;
+    const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
+    const { abilityKey, originX = this.remoteHero.x, originY = this.remoteHero.y, targetX, targetY } = payload;
+
+    // Spawn visual-only VFX for the remote player's ability — no damage applied.
+    if (abilityKey === 'Q') {
+      const frames = this.assets?.vfxFrames?.q_slash_arc ?? null;
+      this.vfxSystem.spawn('q_slash_arc', originX, originY, nowMs, frames, {
+        frameDuration: 70, width: 48, height: 48, color: '#ffe18a',
+      });
+    } else if (abilityKey === 'W') {
+      // Teleport the remote hero to the dash destination visually.
+      if (typeof targetX === 'number' && typeof targetY === 'number') {
+        this._remoteHeroTarget.x = targetX;
+        this._remoteHeroTarget.y = targetY;
+      }
+    } else if (abilityKey === 'E') {
+      const frames = this.assets?.vfxFrames?.e_blast_charge ?? null;
+      this.vfxSystem.spawn('e_blast_charge', originX, originY, nowMs, frames, {
+        frameDuration: 70, width: 48, height: 48, color: '#44ff88',
+      });
+    } else if (abilityKey === 'R') {
+      const frames = this.assets?.vfxFrames?.r_burst_explosion ?? null;
+      const cx = typeof targetX === 'number' ? targetX : originX;
+      const cy = typeof targetY === 'number' ? targetY : originY;
+      this.vfxSystem.spawn('r_burst_explosion', cx, cy, nowMs, frames, {
+        frameDuration: 70, width: 80, height: 80, color: '#ff44ff',
+      });
+    }
+  }
+
+  _onRemoteBasicAttack(payload) {
+    if (!this.remoteHero) return;
+    const nowMs = this.lastFrameAt;
+    const { originX = this.remoteHero.x, originY = this.remoteHero.y } = payload;
+    // Trigger the attack animation on the remote hero.
+    this.remoteHero.attackAnimPhase = 'windUp';
+    this.remoteHero.attackAnimStartMs = nowMs;
+    const frames = this.assets?.vfxFrames?.basic_windup ?? null;
+    this.vfxSystem.spawn('basic_windup', originX, originY, nowMs, frames, {
+      frameDuration: 60, width: 32, height: 32, color: '#ffb833',
+    });
+  }
+
+  // ── Shared: return to main menu ───────────────────────────────────────────
+
+  _returnToMenu(message = '') {
+    // Detach any active room screen.
+    if (
+      this.state === GAME_STATES.roomLobbyHost
+      || this.state === GAME_STATES.roomLobbyClient
+      || this.state === GAME_STATES.joinRoom
+    ) {
+      this.roomScreen.detach();
+    }
+
+    // Detach game input if we were playing.
+    if (
+      this.state === GAME_STATES.playingMultiplayer
+      || this.state === GAME_STATES.playing
+    ) {
+      this.input.detach(this.canvas);
+      if (this.mobileControls.isMobile) this.mobileControls.detach();
+      // Reset game state.
+      this.entities = [];
+      this.effectSystem.effects = [];
+      this.vfxSystem.effects = [];
+      this.projectiles = [];
+      this.pendingVfxSpawns = [];
+      this.clickMarker = null;
+      this.spawnSystem.reset();
+      this.waveCount = 0;
+      this.resultMessage = '';
+      this.remoteHero = null;
+    }
+
+    this.state = GAME_STATES.menu;
+    this.menu.attach();
+
+    if (message) {
+      // Surface the message via the menu's notification field.
+      this.menu._notification = message;
+      setTimeout(() => { this.menu._notification = ''; }, 5000);
+    }
   }
 
   resetMatch() {
@@ -181,7 +517,12 @@ export class Game {
   }
 
   update(dtMs, nowMs) {
-    if (this.state === GAME_STATES.menu) {
+    if (
+      this.state === GAME_STATES.menu
+      || this.state === GAME_STATES.joinRoom
+      || this.state === GAME_STATES.roomLobbyHost
+      || this.state === GAME_STATES.roomLobbyClient
+    ) {
       return;
     }
 
@@ -191,6 +532,8 @@ export class Game {
       }
       return;
     }
+
+    const isMultiplayer = this.state === GAME_STATES.playingMultiplayer;
 
     const dtSeconds = dtMs / 1000;
     this.fps = dtMs > 0 ? (1000 / dtMs) : 0;
@@ -254,7 +597,14 @@ export class Game {
             targetPoint = { x: ap.x + this.camera.x, y: ap.y + this.camera.y };
           }
           const vfxCtx = { vfxSystem: this.vfxSystem, assets: this.assets, nowMs };
-          castAbility(this.hero, releasedKey, this.entities, this.projectiles, vfxCtx, targetPoint);
+          const castOk = castAbility(this.hero, releasedKey, this.entities, this.projectiles, vfxCtx, targetPoint);
+          if (castOk && isMultiplayer) {
+            this.multiplayer.broadcastAbilityCast(
+              releasedKey,
+              this.hero.x, this.hero.y,
+              targetPoint?.x ?? this.hero.x, targetPoint?.y ?? this.hero.y
+            );
+          }
           this.targetingSystem.cancel();
         }
       }
@@ -306,6 +656,13 @@ export class Game {
         if (success) {
           // Cancel targeting mode after a successful cast.
           this.targetingSystem.cancel();
+          if (isMultiplayer) {
+            this.multiplayer.broadcastAbilityCast(
+              selectedKey,
+              this.hero.x, this.hero.y,
+              targetPoint.x, targetPoint.y
+            );
+          }
         }
         // If cast fails (e.g. cooldown or out of range for R), keep targeting mode active.
       } else {
@@ -320,7 +677,7 @@ export class Game {
 
           if (distSq <= attackRangeSq) {
             // In range: trigger basic attack immediately.
-            this._triggerBasicAttack(nowMs);
+            this._triggerBasicAttack(nowMs, isMultiplayer);
           } else {
             // Out of range: move toward the enemy and mark as pending attack target.
             this.hero.targetPosition = { x: enemy.x, y: enemy.y };
@@ -344,7 +701,7 @@ export class Game {
         if (distSq <= this.hero.attackRange * this.hero.attackRange) {
           this.hero.pendingAttackTarget = null;
           this.hero.targetPosition = null;
-          this._triggerBasicAttack(nowMs);
+          this._triggerBasicAttack(nowMs, isMultiplayer);
         }
       }
     }
@@ -458,6 +815,22 @@ export class Game {
     this.applyBaseProximityHeal();
     this.checkWinCondition();
     this.camera.follow(this.hero);
+
+    // ── Multiplayer: remote hero interpolation + state broadcast ─────────────
+    if (isMultiplayer) {
+      // Lerp remote hero toward the last received network position (≈20 Hz).
+      if (this.remoteHero) {
+        const LERP = 0.15;
+        this.remoteHero.x += (this._remoteHeroTarget.x - this.remoteHero.x) * LERP;
+        this.remoteHero.y += (this._remoteHeroTarget.y - this.remoteHero.y) * LERP;
+      }
+      // Rate-limited state broadcast.
+      this._mpTickAccum += dtMs;
+      if (this._mpTickAccum >= MP_TICK_RATE_MS) {
+        this._mpTickAccum -= MP_TICK_RATE_MS;
+        this._broadcastPlayerState();
+      }
+    }
   }
 
   updateHeroVelocity() {
@@ -513,7 +886,8 @@ export class Game {
   }
 
   // Trigger the hero's basic attack animation and set isAttackRequested.
-  _triggerBasicAttack(nowMs) {
+  // When isMultiplayer is true, also broadcasts the event to the remote player.
+  _triggerBasicAttack(nowMs, isMultiplayer = false) {
     const hero = this.hero;
     hero.isAttackRequested = true;
     hero.attackAnimPhase = 'windUp';
@@ -525,6 +899,12 @@ export class Game {
       height: 32,
       color: '#ffb833',
     });
+    if (isMultiplayer) {
+      this.multiplayer.broadcastBasicAttack(
+        hero.x, hero.y,
+        hero.lastMoveDir?.x ?? 1, hero.lastMoveDir?.y ?? 0
+      );
+    }
   }
 
   // Instantly restores the hero to full health when they are standing near the
@@ -641,6 +1021,15 @@ export class Game {
       return;
     }
 
+    if (
+      this.state === GAME_STATES.joinRoom
+      || this.state === GAME_STATES.roomLobbyHost
+      || this.state === GAME_STATES.roomLobbyClient
+    ) {
+      this.roomScreen.render();
+      return;
+    }
+
     this.renderer.clear();
     this.renderer.drawMap(this.map);
 
@@ -651,6 +1040,12 @@ export class Game {
     for (const entity of this.entities) {
       this.renderer.drawEntity(entity);
       this.renderer.drawHealthBar(entity);
+    }
+
+    // Draw remote hero in multiplayer mode (separate from entities[]).
+    if (this.state === GAME_STATES.playingMultiplayer && this.remoteHero) {
+      this.renderer.drawEntity(this.remoteHero);
+      this.renderer.drawHealthBar(this.remoteHero);
     }
 
     for (const effect of this.effectSystem.effects) {
@@ -703,6 +1098,7 @@ export class Game {
 
     // ── HUD text (desktop-style controls, hidden on touch devices) ───────────
     const selectedKey = this.targetingSystem.getSelectedKey();
+    const isMultiplayer = this.state === GAME_STATES.playingMultiplayer;
     if (!this.mobileControls.isMobile) {
       this.renderer.drawText('Move: Right Click  |  Attack: Left Click  |  Q/W/E/R = Ability  |  F/Esc = Cancel', 12, 24);
       if (selectedKey) {
@@ -723,12 +1119,21 @@ export class Game {
         88,
         { font: CONFIG.ui.smallFont, color: CONFIG.ui.secondaryColor }
       );
+      if (isMultiplayer) {
+        const slot = this.multiplayer.myPlayerNumber === 1 ? 'P1 (Blue)' : 'P2 (Red)';
+        this.renderer.drawText(
+          `Multiplayer — ${slot}  |  Room: ${this.multiplayer.roomCode}`,
+          12,
+          104,
+          { font: CONFIG.ui.smallFont, color: '#7dd6a8' }
+        );
+      }
       if (!this.hero.alive) {
         const remainingRespawnMs = Math.max(0, this.hero.respawnAtMs - this.lastFrameAt);
         this.renderer.drawText(
           `Hero Respawn: ${(remainingRespawnMs / 1000).toFixed(1)}s`,
           12,
-          104,
+          isMultiplayer ? 120 : 104,
           { font: CONFIG.ui.smallFont, color: CONFIG.ui.warningColor }
         );
       }
