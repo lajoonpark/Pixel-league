@@ -30,6 +30,49 @@ function generateRoomCode() {
   return code;
 }
 
+// ── Connection test ───────────────────────────────────────────────────────────
+
+// Verifies that Supabase Realtime broadcast is reachable.
+// Creates a temporary channel, subscribes, sends a ping, and waits for the
+// echo (requires self:true so the sender receives its own broadcast).
+// Resolves with true on success, or rejects with an Error on failure/timeout.
+export function testRealtimeConnection({ timeoutMs = 8000 } = {}) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return Promise.reject(new Error('Supabase is not configured.'));
+
+  return new Promise((resolve, reject) => {
+    const channelName = `test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: true } },
+    });
+
+    let settled = false;
+    const finish = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      channel.unsubscribe().catch(() => {});
+      if (err) reject(err); else resolve(true);
+    };
+
+    const timer = setTimeout(
+      () => finish(new Error('Realtime connection timed out.')),
+      timeoutMs
+    );
+
+    channel
+      .on('broadcast', { event: 'ping' }, () => finish(null))
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({ type: 'broadcast', event: 'ping', payload: {} })
+            .catch((err) => finish(err));
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          finish(new Error(`Connection failed: ${status}`));
+        }
+      });
+  });
+}
+
 // ── MultiplayerService ────────────────────────────────────────────────────────
 
 export class MultiplayerService {
