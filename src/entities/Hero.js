@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js';
 import { createHeroAbilities } from '../systems/abilitySystem.js';
 
 export class Hero {
-  constructor(x, y, team = 'blue') {
+  constructor(x, y, team = 'blue', color = null) {
     const heroConfig = CONFIG.hero;
 
     this.type = 'hero';
@@ -17,7 +17,7 @@ export class Hero {
     this.width = heroConfig.width;
     this.height = heroConfig.height;
     this.moveSpeed = heroConfig.moveSpeed;
-    this.color = heroConfig.color;
+    this.color = color !== null ? color : heroConfig.color;
     this.health = heroConfig.health;
     this.maxHealth = heroConfig.health;
     this.alive = true;

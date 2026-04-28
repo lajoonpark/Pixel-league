@@ -364,9 +364,10 @@ The **Create Room** and **Join Room** buttons are enabled automatically once bot
 
 - **Prototype client-sync only** — no server-authoritative gameplay.  Each client simulates AI independently (towers, minions, bases).
 - **Max 2 players** per room.
-- **Player 1** = blue hero.  **Player 2** = red hero.
-- Player positions, health, and ability/attack events are broadcast at ~20 Hz via Supabase Realtime Broadcast.
+- **Player 1** = blue hero (spawns near left/blue base).  **Player 2** = red hero (spawns near right/red base).
+- Player positions, health, team, color, and ability/attack events are broadcast at ~20 Hz via Supabase Realtime Broadcast.
 - Remote hero position is smoothly interpolated between received packets.
+- **Combat against the remote hero is visual-only** — the remote hero is rendered from network state but is not part of the local combat simulation.  Damage and abilities landed on the remote hero have no effect on their client.
 - If Supabase credentials are missing, multiplayer buttons are hidden and single-player still works normally.
 
 ---

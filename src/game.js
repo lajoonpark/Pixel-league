@@ -133,6 +133,89 @@ export class Game {
     };
   }
 
+  // Returns the hero spawn point for the given player slot (1 = blue/left, 2 = red/right).
+  getHeroSpawnPointForPlayer(playerNumber) {
+    const lane = this.map.lanes[0];
+    if (playerNumber === 2) {
+      return {
+        x: lane.end.x - CONFIG.hero.spawnLaneOffsetX,
+        y: lane.end.y,
+      };
+    }
+    return {
+      x: lane.start.x + CONFIG.hero.spawnLaneOffsetX,
+      y: lane.start.y,
+    };
+  }
+
+  // Builds the full world scene for a multiplayer match using the correct
+  // team, color, and spawn point for each player slot.
+  setupMultiplayerWorld() {
+    const lane = this.map.lanes[0];
+    const mp = this.multiplayer;
+    const localNumber = mp.myPlayerNumber;    // 1 or 2
+    const remoteNumber = localNumber === 1 ? 2 : 1;
+
+    // ── Local hero ───────────────────────────────────────────────────────────
+    const localTeam = localNumber === 1 ? 'blue' : 'red';
+    const localColor = PLAYER_COLORS[localNumber];
+    const localSpawn = this.getHeroSpawnPointForPlayer(localNumber);
+    this.hero = new Hero(localSpawn.x, localSpawn.y, localTeam, localColor);
+    this.entities.push(this.hero);
+
+    // ── Structures (identical to setupWorld) ─────────────────────────────────
+    for (const slot of lane.placeholders?.towerSlots ?? []) {
+      this.entities.push(new Tower(slot.x, slot.y, slot.team));
+    }
+
+    const alliedBaseSlot = lane.placeholders?.baseSlots?.find((slot) => slot.team === 'blue');
+    const enemyBaseSlot = lane.placeholders?.baseSlots?.find((slot) => slot.team === 'red');
+    if (alliedBaseSlot) {
+      this.alliedBase = new Base(
+        alliedBaseSlot.x,
+        alliedBaseSlot.y,
+        alliedBaseSlot.team,
+        alliedBaseSlot.width,
+        alliedBaseSlot.height
+      );
+      this.entities.push(this.alliedBase);
+    }
+    if (enemyBaseSlot) {
+      this.enemyBase = new Base(
+        enemyBaseSlot.x,
+        enemyBaseSlot.y,
+        enemyBaseSlot.team,
+        enemyBaseSlot.width,
+        enemyBaseSlot.height
+      );
+      this.entities.push(this.enemyBase);
+    }
+
+    // ── Remote hero (visual-only, not in entities[]) ──────────────────────────
+    const remoteTeam = remoteNumber === 1 ? 'blue' : 'red';
+    const remoteColor = PLAYER_COLORS[remoteNumber];
+    const remoteSpawn = this.getHeroSpawnPointForPlayer(remoteNumber);
+    this.remoteHero = {
+      type: 'hero',
+      renderType: 'hero',
+      spriteId: 'hero',
+      team: remoteTeam,
+      color: remoteColor,
+      x: remoteSpawn.x,
+      y: remoteSpawn.y,
+      width: CONFIG.hero.width,
+      height: CONFIG.hero.height,
+      health: CONFIG.hero.health,
+      maxHealth: CONFIG.hero.health,
+      alive: true,
+      showRangeCircle: false,
+      attackAnimPhase: 'idle',
+      attackAnimStartMs: 0,
+      lastMoveDir: { x: 1, y: 0 },
+    };
+    this._remoteHeroTarget = { x: this.remoteHero.x, y: this.remoteHero.y };
+  }
+
   // Called once by the Menu's Play button – transitions from menu to playing.
   _startGame() {
     this.menu.detach();
@@ -272,44 +355,8 @@ export class Game {
     this.waveCount = 0;
     this.resultMessage = '';
 
-    this.setupWorld();
+    this.setupMultiplayerWorld();
 
-    const mp = this.multiplayer;
-    const isHost = mp.isHost;
-    const localNumber = mp.myPlayerNumber;  // 1 or 2
-
-    // Set local hero color and position based on player slot.
-    this.hero.color = PLAYER_COLORS[localNumber];
-    this.hero.team = isHost ? 'blue' : 'red';
-
-    if (!isHost) {
-      // Player 2 spawns slightly offset so both heroes aren't stacked.
-      const sp = this.getAlliedHeroSpawnPoint();
-      this.hero.x = sp.x + 40;
-      this.hero.y = sp.y + 20;
-    }
-
-    // Create the remote hero object (rendered separately, not in entities[]).
-    const remoteNumber = isHost ? 2 : 1;
-    this.remoteHero = {
-      type: 'hero',
-      renderType: 'hero',
-      spriteId: 'hero',
-      team: remoteNumber === 1 ? 'blue' : 'red',
-      color: PLAYER_COLORS[remoteNumber],
-      x: this.hero.x + 5,
-      y: this.hero.y + 5,
-      width: CONFIG.hero.width,
-      height: CONFIG.hero.height,
-      health: CONFIG.hero.health,
-      maxHealth: CONFIG.hero.health,
-      alive: true,
-      showRangeCircle: false,
-      attackAnimPhase: 'idle',
-      attackAnimStartMs: 0,
-      lastMoveDir: { x: 1, y: 0 },
-    };
-    this._remoteHeroTarget = { x: this.remoteHero.x, y: this.remoteHero.y };
     this._mpTickAccum = 0;
 
     this.state = GAME_STATES.playingMultiplayer;
@@ -330,6 +377,8 @@ export class Game {
   _broadcastPlayerState() {
     const h = this.hero;
     this.multiplayer.broadcastPlayerState({
+      team: h.team,
+      color: h.color,
       x: h.x,
       y: h.y,
       health: h.health,
@@ -350,6 +399,8 @@ export class Game {
     if (typeof payload.health === 'number') this.remoteHero.health = payload.health;
     if (typeof payload.maxHealth === 'number') this.remoteHero.maxHealth = payload.maxHealth;
     if (typeof payload.alive === 'boolean') this.remoteHero.alive = payload.alive;
+    if (typeof payload.team === 'string') this.remoteHero.team = payload.team;
+    if (typeof payload.color === 'string') this.remoteHero.color = payload.color;
     if (payload.lastMoveDir) this.remoteHero.lastMoveDir = payload.lastMoveDir;
     // Sync attack animation phase for visual feedback.
     if (payload.attackAnimPhase && payload.attackAnimPhase !== this.remoteHero.attackAnimPhase) {
@@ -940,7 +991,9 @@ export class Game {
       return;
     }
 
-    const spawnPoint = this.getAlliedHeroSpawnPoint();
+    const spawnPoint = this.state === GAME_STATES.playingMultiplayer
+      ? this.getHeroSpawnPointForPlayer(this.multiplayer.myPlayerNumber)
+      : this.getAlliedHeroSpawnPoint();
     this.hero.x = spawnPoint.x;
     this.hero.y = spawnPoint.y;
     this.hero.vx = 0;
